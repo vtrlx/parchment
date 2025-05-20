@@ -11,9 +11,7 @@ You should have received a copy of the GNU General Public License along with thi
 package.cpath = "/app/lib/lua/5.4/?.so;" .. package.cpath
 package.path = "/app/share/lua/5.4/?.lua;" .. package.path
 
---[[
-SECTION: Support library
-]]--
+-- SECTION: Support library
 
 local lfs = require "lfs"
 local lib = require "parchmentlib"
@@ -122,9 +120,7 @@ local function newclass(init)
 	return setmetatable(c, mt)
 end
 
---[[
-SECTION: Main application
-]]--
+-- SECTION: Main application
 
 local lgi = require "lgi"
 
@@ -172,11 +168,9 @@ local function error(...)
 	lerror(...)
 end
 
---[[
-SECTION: Layout management
-GTK widgets do not provide signals for when they've resized. Instead, one is supposed to use a Layout Manager to handle this. Because the Layout Manager needs to be of a specific class, this will subclass it.
-]]--
+-- SECTION: Layout management
 
+-- GTK widgets do not provide signals for when they've resized. Instead, one is supposed to use a Layout Manager to handle this. Because the Layout Manager needs to be of a specific class, this will subclass it.
 Parchment:class("EditorLayoutManager", Gtk.LayoutManager)
 
 function Parchment.EditorLayoutManager:do_allocate(widget, width, height, baseline)
@@ -192,9 +186,7 @@ function Parchment.EditorLayoutManager:do_allocate(widget, width, height, baseli
 	Gtk.TextView.do_size_allocate(widget, width, height, baseline)
 end
 
---[[
-SECTION: Text editor constructor
-]]--
+-- SECTION: Text editor constructor
 
 -- Holds the data for open files.
 local editors = {}
@@ -220,8 +212,14 @@ local editor = newclass(function(self)
 	sbox:append(searchimg)
 	sbox:append(search_entry)
 	sbox:append(matchnum_label)
-	local prev_match = Gtk.Button.new_from_icon_name "go-up-symbolic"
-	local next_match = Gtk.Button.new_from_icon_name "go-down-symbolic"
+	local prev_match = Gtk.Button {
+		icon_name = "go-up-symbolic",
+		tooltip_text = "Go to previous match",
+	}
+	local next_match = Gtk.Button {
+		icon_name = "go-down-symbolic",
+		tooltip_text = "Go to next match",
+	}
 	local search_box = Gtk.Box {
 		orientation = "HORIZONTAL",
 	}
@@ -233,15 +231,21 @@ local editor = newclass(function(self)
 		placeholder_text = "Replace with…",
 		hexpand = true,
 	}
-	local replace_button = Gtk.Button.new_with_label "Replace"
-	replace_button.tooltip_text = "Replaces selected text"
-	replace_button.sensitive = false
-	local replace_in_sel_button = Gtk.Button.new_with_label "Replace in selection"
-	replace_in_sel_button.tooltip_text = "Replace all matches in selection"
-	replace_in_sel_button.visible = false
-	local replace_all_button = Gtk.Button.new_with_label "Replace all"
-	replace_all_button.tooltip_text = "Replaces all matches in file"
-	replace_all_button.sensitive = false
+	local replace_button = Gtk.Button {
+		label = "Replace",
+		tooltip_text = "Replaces selected text",
+		sensitive = false,
+	}
+	local replace_in_sel_button = Gtk.Button {
+		label = "Replace in selection",
+		tooltip_text = "Replace all matches in the selection",
+		visible = false,
+	}
+	local replace_all_button = Gtk.Button {
+		label = "Replace all",
+		tooltip_text = "Replaces all matches in file",
+		sensitive = false,
+	}
 	local replace_box = Gtk.Box { orientation = "HORIZONTAL" }
 	replace_box:add_css_class "linked"
 	replace_box:append(replace_entry)
@@ -398,9 +402,7 @@ local function get_focused_editor()
 	return editors[page.child]
 end
 
---[[
-SECTION: File Management
-]]--
+-- SECTION: File Management
 
 local file_dialog_path = lib.get_home_directory()
 local filefilters = Gio.ListStore.new(Gtk.FileFilter)
@@ -464,14 +466,12 @@ local function save_file_dialog(window, e)
 	file_dialog:save(window, cancellable, on_save)
 end
 
---[[
-SECTION: Application menus
-]]--
+-- SECTION: Application menus
 
 local file_menu = Gio.Menu()
 file_menu:append("Save As…", "win.save_file_as")
 local nav_menu = Gio.Menu()
-nav_menu:append("Open File Location", "win.open_folder")
+nav_menu:append("Show in Files", "win.open_folder")
 nav_menu:append("Find/Replace", "win.search")
 nav_menu:append("Go to Line", "win.goto")
 local app_menu = Gio.Menu()
@@ -579,9 +579,7 @@ local function about(parent)
 	aboutdlg:present(parent)
 end
 
---[[
-SECTION: Main application window
-]]--
+-- SECTION: Main application window
 
 local function window_new_action(win, name, cb)
 	local action = Gio.SimpleAction.new(name)
@@ -625,11 +623,13 @@ local function new_window()
 	local tab_button = Adw.TabButton {
 		view = tab_view,
 		action_name = "overview.open",
+		tooltip_text = "View all tabs",
 	}
 ]]--
 
 	local save_button = Gtk.Button {
 		icon_name = "document-save-symbolic",
+		tooltip_text = "Save file",
 		visible = false,
 	}
 	function save_button:on_clicked()
@@ -911,9 +911,7 @@ local function new_window()
 	return tab_view
 end
 
---[[
-SECTION: Text editor definitions
-]]--
+-- SECTION: Text editor definitions
 
 local function buffer_read_file(buffer, file_path)
 	local dir, name = lib.dir_and_file(file_path)
@@ -999,7 +997,7 @@ function editor:set_iters(first, second)
 end
 
 function editor:scroll_to_selection()
-	self.tv:scroll_to_mark(self:get_bound(), 0.0, false, 0.0, 0.0)
+	self.tv:scroll_to_mark(self:get_bound(), 0.4999, false, 0.0, 0.0)
 	self.tv:scroll_to_mark(self:get_insert(), 0.2, false, 0.0, 0.0)
 end
 
@@ -1343,9 +1341,7 @@ function editor:begin_jumpover()
 	self.scroll.kinetic_scrolling = true
 end
 
---[[
-SECTION: Application callbacks and startup
-]]--
+-- SECTION: Application callbacks and startup
 
 function app:on_open(files)
 	for _, f in ipairs(files) do
