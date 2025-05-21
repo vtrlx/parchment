@@ -138,8 +138,10 @@ local app_title = "Parchment"
 local app_version = lib.get_app_ver()
 local app  = Adw.Application {
 	application_id = app_id,
-	flags = "HANDLES_OPEN",
+	flags = Gio.ApplicationFlags.HANDLES_OPEN | Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
 }
+
+app:add_main_option("new-window", string.byte "n", "IN_MAIN", "NONE", "Create a new window.")
 
 -- Shortcuts from the GNOME HIG (https://developer.gnome.org/hig/reference/keyboard.html)
 local accels = {
@@ -1087,6 +1089,10 @@ function editor:edit_file(path)
 	self:set_file_path(path)
 	path = self:get_path_info()
 	local attrs = lfs.attributes(path)
+	if not attrs then
+		print("no file", path)
+		return
+	end
 	self.modtime = attrs.modification
 	return buffer_read_file(self.tv.buffer, path)
 end
@@ -1352,6 +1358,31 @@ end
 
 function app:on_activate()
 	if app.active_window then app.active_window:present() end
+end
+
+function app:on_command_line(cli)
+	local argv, argc = cli:get_arguments()
+	local files = {}
+	for i = 2, #argv do
+		filename = argv[i]
+		if filename == "-" then
+			cli:printerr "can't open from stdin"
+			cli:set_exit_status(1)
+			cli:done()
+			return 0
+		end
+		local file = cli:create_file_for_arg(filename)
+		table.insert(files, file)
+	end
+	local opts = cli:get_options_dict()
+	if cli:get_is_remote() and opts:contains "new-window" then
+		new_window()
+	end
+	if #files > 0 then app:open(files, "") end
+	-- Signal that command line options have been handled and that the app should continue starting up.
+	cli:set_exit_status(0)
+	cli:done()
+	return -1
 end
 
 function app:on_startup()

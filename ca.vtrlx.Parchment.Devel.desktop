@@ -8,7 +8,13 @@ Comment=Featureless Text Editor (development version)
 Comment[en]=Featureless Text Editor (development version)
 Type=Application
 Exec=parchment %U
+Actions=new-window;
 MimeType=text/*;
 Terminal=false
 Icon=ca.vtrlx.Parchment.Devel
 StartupNotify=false
+
+[Desktop Action new-window]
+Name=New Window
+Name[en]=New Window
+Exec=parchment --new-window %U
