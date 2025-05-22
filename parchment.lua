@@ -142,9 +142,12 @@ local app  = Adw.Application {
 }
 
 app:add_main_option("new-window", string.byte "n", "IN_MAIN", "NONE", "Create a new window.")
+app:add_main_option("wait-done", string.byte "k", "IN_MAIN", "NONE", "Wait until the given files have been closed.")
 
 -- Shortcuts from the GNOME HIG (https://developer.gnome.org/hig/reference/keyboard.html)
 local accels = {
+	["win.zoom-out"] = { "<Ctrl>minus" },
+	["win.zoom-in"] = { "<Ctrl>equal" },
 	["win.close_tab"] = { "<Ctrl>W" },
 	["win.open_file"] = { "<Ctrl>O" },
 	["win.open_folder"] = { "<Ctrl>D" },
@@ -172,12 +175,78 @@ end
 
 -- SECTION: Layout management
 
+local zoomlevels = {
+	current = 3,
+	{ label = "75%", factor = 0.75 },
+	{ label = "90%", factor = 0.9 },
+	{ label = "100%", factor = 1 },
+	{ label = "110%", factor = 1.1 },
+	{ label = "125%", factor = 1.25 },
+	{ label = "133%", factor = 4/3 },
+	{ label = "150%", factor = 1.5 },
+	{ label = "166%", factor = 5/3 },
+	{ label = "180%", factor = 1.8 },
+	{ label = "200%", factor = 2 },
+}
+
+local function get_zoom_dimensions(level)
+	assert(type(level) == "number" and level % 1 == 0)
+	assert(level >= 1 and level <= #zoomlevels)
+	local factor = zoomlevels[level].factor
+	local points = 11 * factor
+	local width = 640 * factor
+	local margin = 24 * factor
+	return points, width, margin
+end
+
+local css_template = [[
+textview.parchment {
+	font-size: %fpt;
+}
+]]
+
+local css_providers = {}
+do -- Set up CSS providers for each zoom level.
+	for i = 1, #zoomlevels do
+		local points = get_zoom_dimensions(i)
+		local css = css_template:format(points)
+		local provider = Gtk.CssProvider()
+		provider:load_from_string(css)
+		table.insert(css_providers, provider)
+	end
+end
+
+local function refresh_zoom(previous)
+	local display = Gdk.Display.get_default()
+	if previous then
+		local oldprovider = css_providers[previous]
+		Gtk.StyleContext.remove_provider_for_display(display, oldprovider)
+	end
+	local newprovider = css_providers[zoomlevels.current]
+	Gtk.StyleContext.add_provider_for_display(display, newprovider, 1000000)
+end
+
+refresh_zoom()
+
+local function zoom_out()
+	local previous = zoomlevels.current
+	if previous == 1 then return end
+	zoomlevels.current = previous - 1
+	refresh_zoom(previous)
+end
+
+local function zoom_in()
+	local previous = zoomlevels.current
+	if previous == #zoomlevels then return end
+	zoomlevels.current = previous + 1
+	refresh_zoom(previous)
+end
+
 -- GTK widgets do not provide signals for when they've resized. Instead, one is supposed to use a Layout Manager to handle this. Because the Layout Manager needs to be of a specific class, this will subclass it.
 Parchment:class("EditorLayoutManager", Gtk.LayoutManager)
 
 function Parchment.EditorLayoutManager:do_allocate(widget, width, height, baseline)
-	local minmargin = 24
-	local maxwidth = 640
+	local _, maxwidth, minmargin = get_zoom_dimensions(zoomlevels.current)
 	local maxinner = maxwidth - minmargin * 2
 	local totalmargin = math.max(minmargin, (width - maxinner) / 2)
 	-- In case of the margin space being an odd number, the extra pixel gets assigned to the right side.
@@ -188,7 +257,7 @@ function Parchment.EditorLayoutManager:do_allocate(widget, width, height, baseli
 	Gtk.TextView.do_size_allocate(widget, width, height, baseline)
 end
 
--- SECTION: Text editor constructor
+-- SECTION: Text editor
 
 -- Holds the data for open files.
 local editors = {}
@@ -283,6 +352,7 @@ local editor = newclass(function(self)
 		wrap_mode = Gtk.WrapMode.WORD_CHAR,
 	}
 	text_view:add_css_class "numeric"
+	text_view:add_css_class "parchment"
 	text_view.buffer:set_max_undo_levels(0)
 	local scrolled_win = Gtk.ScrolledWindow {
 		hscrollbar_policy = "NEVER",
@@ -591,7 +661,7 @@ local function window_new_action(win, name, cb)
 	return action
 end
 
--- Returns a new application window and its inner tab view.
+-- Creates a new window and presents it, returning the inner tab view.
 local function new_window()
 	local new_tab_button = Gtk.Button {
 		halign = "START",
@@ -840,6 +910,14 @@ local function new_window()
 		open_file(file:get_path())
 	end
 	window:add_controller(file_drop_target)
+
+	window_new_action(window, "zoom-out", function()
+		zoom_out()
+	end)
+
+	window_new_action(window, "zoom-in", function()
+		zoom_in()
+	end)
 
 	window_new_action(window, "close_tab", function()
 		local page = tab_view.selected_page
