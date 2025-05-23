@@ -146,8 +146,8 @@ app:add_main_option("wait-done", string.byte "k", "IN_MAIN", "NONE", "Wait until
 
 -- Shortcuts from the GNOME HIG (https://developer.gnome.org/hig/reference/keyboard.html)
 local accels = {
-	["win.zoom-out"] = { "<Ctrl>minus" },
-	["win.zoom-in"] = { "<Ctrl>equal" },
+	["app.zoom-out"] = { "<Ctrl>minus" },
+	["app.zoom-in"] = { "<Ctrl>equal" },
 	["win.close_tab"] = { "<Ctrl>W" },
 	["win.open_file"] = { "<Ctrl>O" },
 	["win.open_folder"] = { "<Ctrl>D" },
@@ -173,6 +173,10 @@ local function error(...)
 	lerror(...)
 end
 
+-- SECTION: Critically important global variables
+local editors = {}
+local window_widgets = {}
+
 -- SECTION: Layout management
 
 local zoomlevels = {
@@ -194,9 +198,10 @@ local function get_zoom_dimensions(level)
 	assert(level >= 1 and level <= #zoomlevels)
 	local factor = zoomlevels[level].factor
 	local points = 11 * factor
+	local pixels = 8 * factor
 	local width = 640 * factor
 	local margin = 24 * factor
-	return points, width, margin
+	return points, pixels, width, margin
 end
 
 local css_template = [[
@@ -222,8 +227,15 @@ local function refresh_zoom(previous)
 		local oldprovider = css_providers[previous]
 		Gtk.StyleContext.remove_provider_for_display(display, oldprovider)
 	end
-	local newprovider = css_providers[zoomlevels.current]
+	local currentzoom = zoomlevels.current
+	local newprovider = css_providers[currentzoom]
 	Gtk.StyleContext.add_provider_for_display(display, newprovider, 1000000)
+	local _, pixels = get_zoom_dimensions(currentzoom)
+	local above, below = math.floor(pixels / 2), math.ceil(pixels / 2)
+	for _, e in pairs(editors) do
+		e.tv.pixels_above_lines = above
+		e.tv.pixels_below_lines = below
+	end
 end
 
 refresh_zoom()
@@ -242,11 +254,18 @@ local function zoom_in()
 	refresh_zoom(previous)
 end
 
+local function zoom_reset()
+	local previous = zoomlevels.current
+	if previous == 3 then return end
+	zoomlevels.current = 3
+	refresh_zoom(previous)
+end
+
 -- GTK widgets do not provide signals for when they've resized. Instead, one is supposed to use a Layout Manager to handle this. Because the Layout Manager needs to be of a specific class, this will subclass it.
 Parchment:class("EditorLayoutManager", Gtk.LayoutManager)
 
 function Parchment.EditorLayoutManager:do_allocate(widget, width, height, baseline)
-	local _, maxwidth, minmargin = get_zoom_dimensions(zoomlevels.current)
+	local _, _, maxwidth, minmargin = get_zoom_dimensions(zoomlevels.current)
 	local maxinner = maxwidth - minmargin * 2
 	local totalmargin = math.max(minmargin, (width - maxinner) / 2)
 	-- In case of the margin space being an odd number, the extra pixel gets assigned to the right side.
@@ -258,10 +277,6 @@ function Parchment.EditorLayoutManager:do_allocate(widget, width, height, baseli
 end
 
 -- SECTION: Text editor
-
--- Holds the data for open files.
-local editors = {}
-local window_widgets = {}
 
 local editor = newclass(function(self)
 	local searchimg = Gtk.Image { icon_name = "system-search-symbolic" }
@@ -340,13 +355,16 @@ local editor = newclass(function(self)
 		show_close_button = true,
 	}
 	search_bar:connect_entry(search_entry)
+	local currentzoom = zoomlevels.current
+	local _, pixels = get_zoom_dimensions(currentzoom)
+	local above, below = math.floor(pixels / 2), math.ceil(pixels / 2)
 	local text_view = Gtk.TextView {
 		top_margin = 12,
 		bottom_margin = 400,
 		left_margin = 24,
 		right_margin = 24,
-		pixels_above_lines = 4,
-		pixels_below_lines = 4,
+		pixels_above_lines = above,
+		pixels_below_lines = below,
 		pixels_inside_wrap = 0,
 		layout_manager = Parchment.EditorLayoutManager(),
 		wrap_mode = Gtk.WrapMode.WORD_CHAR,
@@ -540,6 +558,9 @@ end
 
 -- SECTION: Application menus
 
+local zoom_item = Gio.MenuItem.new()
+local zoom_custom_value = GLib.Variant("s", "zoom_section")
+zoom_item:set_attribute_value("custom", zoom_custom_value)
 local file_menu = Gio.Menu()
 file_menu:append("Save As…", "win.save_file_as")
 local nav_menu = Gio.Menu()
@@ -551,6 +572,7 @@ app_menu:append("New Window", "win.new_window")
 app_menu:append("Keyboard Shortcuts", "win.shortcuts")
 app_menu:append("About " .. app_title, "win.about")
 local burger_menu = Gio.Menu()
+burger_menu:append_item(zoom_item)
 burger_menu:append_section(nil, file_menu)
 burger_menu:append_section(nil, nav_menu)
 burger_menu:append_section(nil, app_menu)
@@ -653,11 +675,11 @@ end
 
 -- SECTION: Main application window
 
-local function window_new_action(win, name, cb)
+local function add_new_action(map, name, cb)
 	local action = Gio.SimpleAction.new(name)
 	action.enabled = true
 	action.on_activate = cb
-	win:add_action(action)
+	map:add_action(action)
 	return action
 end
 
@@ -677,12 +699,54 @@ local function new_window()
 		tooltip_text = "Open a file",
 	}
 
+	local zoom_out_button = Gtk.Button {
+		icon_name = "zoom-out-symbolic",
+		action_name = "app.zoom-out",
+	}
+
+	local zoom_in_button = Gtk.Button {
+		icon_name = "zoom-in-symbolic",
+		action_name = "app.zoom-in",
+	}
+
+	local currentzoom = zoomlevels.current
+	local zoompercent = zoomlevels[currentzoom].label
+	local zoom_reset_button = Gtk.Button {
+		label = zoompercent,
+		action_name = "app.zoom-reset",
+		hexpand = true,
+		width_request = 100,
+	}
+	zoom_reset_button:add_css_class "numeric"
+
+	local zoom_label = Gtk.Label {
+		label = "Zoom",
+		margin_start = 12,
+	}
+	local zoom_buttons = Gtk.Box {
+		orientation = "HORIZONTAL",
+		halign = "END",
+		margin_start = 64,
+	}
+	zoom_buttons:add_css_class "linked"
+	zoom_buttons:append(zoom_out_button)
+	zoom_buttons:append(zoom_reset_button)
+	zoom_buttons:append(zoom_in_button)
+	local zoom_box = Gtk.Box {
+		orientation = "HORIZONTAL",
+		hexpand = true,
+	}
+	zoom_box:append(zoom_label)
+	zoom_box:append(zoom_buttons)
+
+	local burger_popover = Gtk.PopoverMenu.new_from_model(burger_menu)
+	burger_popover.halign = "END"
+	burger_popover:add_child(zoom_box, "zoom_section")
 	local menu_button = Gtk.MenuButton {
 		direction = "DOWN",
 		icon_name = "open-menu-symbolic",
-		menu_model = burger_menu,
+		popover = burger_popover,
 	}
-	menu_button.popover.halign = "END"
 
 	local tab_view = Adw.TabView {
 		vexpand = true,
@@ -865,6 +929,7 @@ local function new_window()
 	window_widgets[window] = {
 		tab_view = tab_view,
 		in_handle = in_handle,
+		zoom_reset_button = zoom_reset_button,
 	}
 	function window:on_close_request()
 		local n_pages = tab_view:get_n_pages()
@@ -911,25 +976,17 @@ local function new_window()
 	end
 	window:add_controller(file_drop_target)
 
-	window_new_action(window, "zoom-out", function()
-		zoom_out()
-	end)
-
-	window_new_action(window, "zoom-in", function()
-		zoom_in()
-	end)
-
-	window_new_action(window, "close_tab", function()
+	add_new_action(window, "close_tab", function()
 		local page = tab_view.selected_page
 		if not page then return true end
 		tab_view:close_page(page)
 	end)
 
-	window_new_action(window, "open_file", function()
+	add_new_action(window, "open_file", function()
 		open_file_dialog(window)
 	end)
 
-	window_widgets[window].open_folder_action = window_new_action(window, "open_folder", function()
+	window_widgets[window].open_folder_action = add_new_action(window, "open_folder", function()
 		local e = get_focused_editor()
 		if not e or not e:has_file() then return end
 		local _, dir = e:get_path_info()
@@ -937,11 +994,11 @@ local function new_window()
 	end)
 	window_widgets[window].open_folder_action.enabled = false
 
-	window_new_action(window, "new_file", function()
+	add_new_action(window, "new_file", function()
 		open_file()
 	end)
 
-	window_new_action(window, "save_file", function()
+	add_new_action(window, "save_file", function()
 		local e = get_focused_editor()
 		if not e then return end
 		if e:has_file() then
@@ -951,36 +1008,36 @@ local function new_window()
 		end
 	end)
 
-	window_new_action(window, "save_file_as", function()
+	add_new_action(window, "save_file_as", function()
 		local e = get_focused_editor()
 		if not e then return end
 		save_file_dialog(window, e)
 	end)
 
-	window_widgets[window].search_action = window_new_action(window, "search", function()
+	window_widgets[window].search_action = add_new_action(window, "search", function()
 		local e = get_focused_editor()
 		if not e then return end
 		e:begin_search()
 	end)
 	window_widgets[window].search_action.enabled = false
 
-	window_widgets[window].goto_action = window_new_action(window, "goto", function()
+	window_widgets[window].goto_action = add_new_action(window, "goto", function()
 		local e = get_focused_editor()
 		if not e then return end
 		e:begin_jumpover()
 	end)
 	window_widgets[window].goto_action.enabled = false
 
-	window_new_action(window, "new_window", function()
+	add_new_action(window, "new_window", function()
 		new_window()
 	end)
 
-	window_new_action(window, "shortcuts", function()
+	add_new_action(window, "shortcuts", function()
 		local shortcutwin = newshortwindow(window)
 		shortcutwin:present()
 	end)
 
-	window_new_action(window, "about", function()
+	add_new_action(window, "about", function()
 		about(window)
 	end)
 
@@ -1426,6 +1483,39 @@ function editor:begin_jumpover()
 end
 
 -- SECTION: Application callbacks and startup
+
+local function update_zoom_actions()
+	local current = zoomlevels.current
+	local zoom_out = app:lookup_action "zoom-out"
+	zoom_out.enabled = current > 1
+	local zoom_in = app:lookup_action "zoom-in"
+	zoom_in.enabled = current < #zoomlevels
+	local zoom_reset = app:lookup_action "zoom-reset"
+	zoom_reset.enabled = current ~= 3
+	local label = zoomlevels[current].label
+	for _, w in pairs(window_widgets) do
+		w.zoom_reset_button.label = label
+	end
+end
+
+do -- Add app-wide actions.
+	add_new_action(app, "zoom-out", function()
+		zoom_out()
+		update_zoom_actions()
+	end)
+
+	add_new_action(app, "zoom-in", function()
+		zoom_in()
+		update_zoom_actions()
+	end)
+
+	-- Because the zoom defaults to 100, there's no need to reset the zoom level.
+	local reset_action = add_new_action(app, "zoom-reset", function()
+		zoom_reset()
+		update_zoom_actions()
+	end)
+	reset_action.enabled = false
+end
 
 function app:on_open(files)
 	for _, f in ipairs(files) do
