@@ -149,16 +149,16 @@ local accels = {
 	["app.zoom-out"] = { "<Ctrl>minus" },
 	["app.zoom-reset"] = { "<Ctrl>equal" },
 	["app.zoom-in"] = { "<Ctrl><Shift>plus" },
-	["win.close_tab"] = { "<Ctrl>W" },
-	["win.open_file"] = { "<Ctrl>O" },
-	["win.open_folder"] = { "<Ctrl>D" },
-	["win.new_file"] = { "<Ctrl>T" },
-	["win.save_file"] = { "<Ctrl>S" },
-	["win.save_file_as"] = { "<Ctrl><Shift>S" },
+	["win.new-file"] = { "<Ctrl>T" },
+	["win.open-file"] = { "<Ctrl>O" },
+	["win.new-window"] = {"<Ctrl>N" },
+	["win.shortcuts"] = { "<Ctrl><Shift>question" },
+	["win.open-folder"] = { "<Ctrl>D" },
+	["win.close-tab"] = { "<Ctrl>W" },
+	["win.save-file"] = { "<Ctrl>S" },
+	["win.save-file-as"] = { "<Ctrl><Shift>S" },
 	["win.search"] = { "<Ctrl>F" },
 	["win.goto"] = { "<Ctrl>I" },
-	["win.new_window"] = {"<Ctrl>N" },
-	["win.shortcuts"] = { "<Ctrl><Shift>question" },
 }
 for k, v in pairs(accels) do
 	app:set_accels_for_action(k, v)
@@ -514,10 +514,6 @@ local function open_file_dialog(window)
 		initial_folder = Gio.File.new_for_path(dir),
 		filters = filefilters,
 	}
-	local cancellable = Gio.Cancellable {}
-	function cancellable:on_cancelled()
-		file_dialog:close()
-	end
 	local function on_open(src, res)
 		local list = file_dialog:open_multiple_finish(res)
 		if not list then return end
@@ -530,7 +526,7 @@ local function open_file_dialog(window)
 			open_file(file:get_path())
 		end
 	end
-	file_dialog:open_multiple(window, cancellable, on_open)
+	file_dialog:open_multiple(window, nil, on_open)
 end
 
 local function save_file_dialog(window, e)
@@ -564,13 +560,13 @@ local zoom_item = Gio.MenuItem.new()
 local zoom_custom_value = GLib.Variant("s", "zoom_section")
 zoom_item:set_attribute_value("custom", zoom_custom_value)
 local file_menu = Gio.Menu()
-file_menu:append("Save As…", "win.save_file_as")
+file_menu:append("Save As…", "win.save-file-as")
 local nav_menu = Gio.Menu()
-nav_menu:append("Show in Files", "win.open_folder")
+nav_menu:append("Show in Files", "win.open-folder")
 nav_menu:append("Find/Replace", "win.search")
 nav_menu:append("Go to Line", "win.goto")
 local app_menu = Gio.Menu()
-app_menu:append("New Window", "win.new_window")
+app_menu:append("New Window", "win.new-window")
 app_menu:append("Keyboard Shortcuts", "win.shortcuts")
 app_menu:append("About " .. app_title, "win.about")
 local burger_menu = Gio.Menu()
@@ -584,17 +580,17 @@ local function newshortwindow(parent)
 		title = "Parchment",
 	}
 	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.open_file",
+		action_name = "win.open-file",
 		title = "Open a file",
 		accelerator = "<Ctrl>O",
 	})
 	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.new_tab",
+		action_name = "win.new-tab",
 		title = "New file",
 		accelerator = "<Ctrl>T",
 	})
 	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.new_window",
+		action_name = "win.new-window",
 		title = "New window",
 		accelerator = "<Ctrl>N",
 	})
@@ -608,17 +604,17 @@ local function newshortwindow(parent)
 		title = "Editor",
 	}
 	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.open_folder",
+		action_name = "win.open-folder",
 		title = "Open in Files",
 		accelerator = "<Ctrl>D",
 	})
 	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.save_file",
+		action_name = "win.save-file",
 		title = "Save file",
 		accelerator = "<Ctrl>S",
 	})
 	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.save_file_as",
+		action_name = "win.save-file-as",
 		title = "Save file as",
 		accelerator = "<Ctrl><Shift>S",
 	})
@@ -633,7 +629,7 @@ local function newshortwindow(parent)
 		accelerator = "<Ctrl>I",
 	})
 	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.close_tab",
+		action_name = "win.close-tab",
 		title = "Close tab",
 		accelerator = "<Ctrl>W",
 	})
@@ -712,35 +708,37 @@ end
 -- Creates a new window and presents it, returning the inner tab view.
 local function new_window()
 	local new_tab_button = Gtk.Button {
+		action_name = "win.new-file",
 		halign = "START",
 		icon_name = "document-new-symbolic",
 		tooltip_text = "New file",
 	}
-	function new_tab_button:on_clicked()
-		open_file()
-	end
 
 	local open_file_button = Gtk.Button {
+		action_name = "win.open-file",
 		icon_name = "document-open-symbolic",
 		tooltip_text = "Open a file",
 	}
 
 	local zoom_out_button = Gtk.Button {
-		icon_name = "zoom-out-symbolic",
 		action_name = "app.zoom-out",
+		icon_name = "zoom-out-symbolic",
+		tooltip_text = "Zoom out",
 	}
 
 	local zoom_in_button = Gtk.Button {
-		icon_name = "zoom-in-symbolic",
 		action_name = "app.zoom-in",
+		icon_name = "zoom-in-symbolic",
+		tooltip_text = "Zoom in",
 	}
 
 	local currentzoom = zoomlevels.current
 	local zoompercent = zoomlevels[currentzoom].label
 	local zoom_reset_button = Gtk.Button {
-		label = zoompercent,
 		action_name = "app.zoom-reset",
 		hexpand = true,
+		label = zoompercent,
+		tooltip_text = "Reset zoom to 100%",
 		width_request = 100,
 	}
 	zoom_reset_button:add_css_class "numeric"
@@ -783,26 +781,18 @@ local function new_window()
 
 --[[
 	local tab_button = Adw.TabButton {
-		view = tab_view,
 		action_name = "overview.open",
 		tooltip_text = "View all tabs",
+		view = tab_view,
 	}
 ]]--
 
 	local save_button = Gtk.Button {
+		action_name = "win.save-file",
 		icon_name = "document-save-symbolic",
 		tooltip_text = "Save file",
 		visible = false,
 	}
-	function save_button:on_clicked()
-		local e = get_focused_editor()
-		if not e then return end
-		if e:has_file() then
-			e:save()
-		else
-			save_file_dialog(window, e)
-		end
-	end
 
 	local window_title = Adw.WindowTitle.new(app_title, "")
 
@@ -844,10 +834,6 @@ local function new_window()
 	window:set_default_size(640, 720)
 	window.width_request = 480
 	window.height_request = 480
-
-	function open_file_button:on_clicked()
-		open_file_dialog(window)
-	end
 
 	function tab_view:on_page_attached(page)
 		local e = editors[page.child]
@@ -1002,17 +988,17 @@ local function new_window()
 	end
 	window:add_controller(file_drop_target)
 
-	add_new_action(window, "close_tab", function()
+	add_new_action(window, "close-tab", function()
 		local page = tab_view.selected_page
 		if not page then return true end
 		tab_view:close_page(page)
 	end)
 
-	add_new_action(window, "open_file", function()
+	add_new_action(window, "open-file", function()
 		open_file_dialog(window)
 	end)
 
-	window_widgets[window].open_folder_action = add_new_action(window, "open_folder", function()
+	window_widgets[window].open_folder_action = add_new_action(window, "open-folder", function()
 		local e = get_focused_editor()
 		if not e or not e:has_file() then return end
 		local _, dir = e:get_path_info()
@@ -1020,11 +1006,11 @@ local function new_window()
 	end)
 	window_widgets[window].open_folder_action.enabled = false
 
-	add_new_action(window, "new_file", function()
+	add_new_action(window, "new-file", function()
 		open_file()
 	end)
 
-	add_new_action(window, "save_file", function()
+	add_new_action(window, "save-file", function()
 		local e = get_focused_editor()
 		if not e then return end
 		if e:has_file() then
@@ -1034,7 +1020,7 @@ local function new_window()
 		end
 	end)
 
-	add_new_action(window, "save_file_as", function()
+	add_new_action(window, "save-file-as", function()
 		local e = get_focused_editor()
 		if not e then return end
 		save_file_dialog(window, e)
@@ -1054,7 +1040,7 @@ local function new_window()
 	end)
 	window_widgets[window].goto_action.enabled = false
 
-	add_new_action(window, "new_window", function()
+	add_new_action(window, "new-window", function()
 		new_window()
 	end)
 
