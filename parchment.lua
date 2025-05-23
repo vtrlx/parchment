@@ -147,7 +147,8 @@ app:add_main_option("wait-done", string.byte "k", "IN_MAIN", "NONE", "Wait until
 -- Shortcuts from the GNOME HIG (https://developer.gnome.org/hig/reference/keyboard.html)
 local accels = {
 	["app.zoom-out"] = { "<Ctrl>minus" },
-	["app.zoom-in"] = { "<Ctrl>equal" },
+	["app.zoom-reset"] = { "<Ctrl>equal" },
+	["app.zoom-in"] = { "<Ctrl><Shift>plus" },
 	["win.close_tab"] = { "<Ctrl>W" },
 	["win.open_file"] = { "<Ctrl>O" },
 	["win.open_folder"] = { "<Ctrl>D" },
@@ -238,6 +239,7 @@ local function refresh_zoom(previous)
 	end
 end
 
+-- Ensure that the default is active when starting up.
 refresh_zoom()
 
 local function zoom_out()
@@ -578,17 +580,36 @@ burger_menu:append_section(nil, nav_menu)
 burger_menu:append_section(nil, app_menu)
 
 local function newshortwindow(parent)
+	local appgroup = Gtk.ShortcutsGroup {
+		title = "Parchment",
+	}
+	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
+		action_name = "win.open_file",
+		title = "Open a file",
+		accelerator = "<Ctrl>O",
+	})
+	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
+		action_name = "win.new_tab",
+		title = "New file",
+		accelerator = "<Ctrl>T",
+	})
+	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
+		action_name = "win.new_window",
+		title = "New window",
+		accelerator = "<Ctrl>N",
+	})
+	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
+		action_name = "win.shortcuts",
+		title = "Keyboard shortcuts",
+		accelerator = "<Ctrl><Shift>question",
+	})
+
 	local editorgroup = Gtk.ShortcutsGroup {
 		title = "Editor",
 	}
 	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.open_file",
-		title = "Open file",
-		accelerator = "<Ctrl>O",
-	})
-	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
 		action_name = "win.open_folder",
-		title = "Open file location",
+		title = "Open in Files",
 		accelerator = "<Ctrl>D",
 	})
 	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
@@ -612,35 +633,40 @@ local function newshortwindow(parent)
 		accelerator = "<Ctrl>I",
 	})
 	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.new_tab",
-		title = "New tab",
-		accelerator = "<Ctrl>T",
-	})
-	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
 		action_name = "win.close_tab",
 		title = "Close tab",
 		accelerator = "<Ctrl>W",
 	})
 
+	local zoomgroup = Gtk.ShortcutsGroup {
+		title = "Zoom",
+	}
+	zoomgroup:add_shortcut(Gtk.ShortcutsShortcut {
+		action_name = "app.zoom-out",
+		title = "Zoom out",
+		accelerator = "<Ctrl>minus",
+	})
+	zoomgroup:add_shortcut(Gtk.ShortcutsShortcut {
+		action_name = "app.zoom-in",
+		title = "Zoom in",
+		accelerator = "<Ctrl><Shift>plus",
+	})
+	zoomgroup:add_shortcut(Gtk.ShortcutsShortcut {
+		action_name = "app.zoom-reset",
+		title = "Reset zoom level",
+		accelerator = "<Ctrl>equal",
+	})
+
 	local miscgroup = Gtk.ShortcutsGroup {
 		title = "Application",
 	}
-	miscgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.new_window",
-		title = "New window",
-		accelerator = "<Ctrl>N",
-	})
-	miscgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.shortcuts",
-		title = "Keyboard shortcuts",
-		accelerator = "<Ctrl><Shift>question",
-	})
 
 	local shortsection = Gtk.ShortcutsSection {
 		title = app_title
 	}
+	shortsection:add_group(appgroup)
+	shortsection:add_group(zoomgroup)
 	shortsection:add_group(editorgroup)
-	shortsection:add_group(miscgroup)
 	shortcutwin = Gtk.ShortcutsWindow()
 	shortcutwin:add_section(shortsection)
 	shortcutwin.transient_for = parent
