@@ -209,6 +209,11 @@ local css_template = [[
 textview.parchment {
 	font-size: %fpt;
 }
+
+/* The Gtk.Image class becomes more opaque when hovered, indicating an action. This change prevents that. */
+image.parchment:hover {
+	opacity: 0.7;
+}
 ]]
 
 local css_providers = {}
@@ -282,15 +287,26 @@ end
 
 local editor = newclass(function(self)
 	local searchimg = Gtk.Image { icon_name = "system-search-symbolic" }
+	searchimg:add_css_class "parchment"
 	local search_entry = Gtk.Text {
 		placeholder_text = "Find in file…",
 		hexpand = true,
 	}
+	local search_clear = Gtk.Button {
+		css_name = "image",
+		icon_name = "edit-clear-symbolic",
+		margin_start = 12,
+		visible = false,
+	}
+	function search_clear:on_clicked()
+		search_entry.text = ""
+		search_entry:grab_focus()
+	end
 	local matchnum_label = Gtk.Label {
-		margin_start = 18,
-		margin_end = 6,
 		halign = "END",
 		hexpand = false,
+		margin_start = 6,
+		margin_end = 6,
 	}
 	matchnum_label:add_css_class "numeric"
 	local sbox = Gtk.Box {
@@ -299,6 +315,7 @@ local editor = newclass(function(self)
 	}
 	sbox:append(searchimg)
 	sbox:append(search_entry)
+	sbox:append(search_clear)
 	sbox:append(matchnum_label)
 	local prev_match = Gtk.Button {
 		icon_name = "go-up-symbolic",
@@ -315,10 +332,27 @@ local editor = newclass(function(self)
 	search_box:append(sbox)
 	search_box:append(prev_match)
 	search_box:append(next_match)
-	local replace_entry = Gtk.Entry {
+	local replace_entry = Gtk.Text {
 		placeholder_text = "Replace with…",
 		hexpand = true,
 	}
+	local replace_clear = Gtk.Button {
+		css_name = "image",
+		icon_name = "edit-clear-symbolic",
+		margin_start = 12,
+		margin_end = 6,
+		visible = false,
+	}
+	function replace_clear:on_clicked()
+		replace_entry.text = ""
+		replace_entry:grab_focus()
+	end
+	local rbox = Gtk.Box {
+		css_name = "entry",
+		orientation = "HORIZONTAL",
+	}
+	rbox:append(replace_entry)
+	rbox:append(replace_clear)
 	local replace_button = Gtk.Button {
 		label = "Replace",
 		tooltip_text = "Replaces selected text",
@@ -336,7 +370,7 @@ local editor = newclass(function(self)
 	}
 	local replace_box = Gtk.Box { orientation = "HORIZONTAL" }
 	replace_box:add_css_class "linked"
-	replace_box:append(replace_entry)
+	replace_box:append(rbox)
 	replace_box:append(replace_button)
 	replace_box:append(replace_in_sel_button)
 	replace_box:append(replace_all_button)
@@ -416,6 +450,10 @@ local editor = newclass(function(self)
 			replace_all_button.sensitive = false
 		end
 	end
+	function replchanged()
+		refresh_repl_buttons()
+		replace_clear.visible = #replace_entry.text > 0
+	end
 	function self.tv.buffer.on_mark_set(iter, mark)
 		refresh_repl_buttons()
 	end
@@ -423,9 +461,11 @@ local editor = newclass(function(self)
 		-- Skip searching if nothing is written.
 		if #search_entry.text == 0 then
 			matchnum_label.label = ""
+			search_clear.visible = false
 			return
 		end
 		matchnum_label.label = self:findall(search_entry.text)
+		search_clear.visible = true
 		refresh_repl_buttons()
 	end
 	local function prev()
@@ -452,7 +492,7 @@ local editor = newclass(function(self)
 		refresh_repl_buttons()
 	end
 	search_entry.buffer.on_notify.text = dosearch
-	replace_entry.buffer.on_notify.text = refresh_repl_buttons
+	replace_entry.buffer.on_notify.text = replchanged
 	prev_match.on_clicked = prev
 	next_match.on_clicked = next
 	search_entry.on_activate = next
