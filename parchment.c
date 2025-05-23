@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License along with thi
 #include <lauxlib.h>
 #include <lualib.h>
 
-#define VERSION "0.1"
+#define VERSION "alpha"
 
 static int
 get_is_devel_lua(lua_State *L)
@@ -106,7 +106,12 @@ main(int _argc, char **_argv)
 {
 	lua_State *L;
 	const char *message;
-	size_t parchment_bytecode_len = ((size_t)&_binary_parchment_bytecode_end) - ((size_t)&_binary_parchment_bytecode_start);
+	char *bytecode_end, *bytecode_start;
+	size_t bytecode_len;
+
+	bytecode_end = (char *)&_binary_parchment_bytecode_end;
+	bytecode_start = (char *)&_binary_parchment_bytecode_start;
+	bytecode_len = bytecode_end - bytecode_start;
 
 	argc = _argc;
 	argv = _argv;
@@ -121,9 +126,9 @@ main(int _argc, char **_argv)
 	lua_settable(L, -3);
 	lua_remove(L, -1);
 
-	switch (luaL_loadbuffer(L, _binary_parchment_bytecode_start, parchment_bytecode_len, "parchment")) {
+	switch (luaL_loadbuffer(L, bytecode_start, bytecode_len, "parchment")) {
 	case LUA_ERRSYNTAX:
-		fprintf(stderr, "Failed to load Parchment: embedded binary is malformed.\n");
+		fprintf(stderr, "Failed to load Parchment: binary is malformed.\n");
 		message = luaL_checkstring(L, -1);
 		if (message)
 			fprintf(stderr, "%s\n", message);

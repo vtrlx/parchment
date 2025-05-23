@@ -7,13 +7,8 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 
 You should have received a copy of the GNU General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>. ]]--
 
--- This app runs in Flatpak, which puts Lua libraries outside of the standard paths. These lines tell Lua to look for libraries where Flatpak has put them.
-package.cpath = "/app/lib/lua/5.4/?.so;" .. package.cpath
-package.path = "/app/share/lua/5.4/?.lua;" .. package.path
-
 -- SECTION: Support library
 
-local lfs = require "lfs"
 local lib = require "parchmentlib"
 
 function lib.get_home_directory()
@@ -122,6 +117,11 @@ end
 
 -- SECTION: Main application
 
+-- This app runs in Flatpak, which puts Lua libraries outside of the standard paths. These lines tell Lua to look for libraries where Flatpak has put them.
+package.cpath = "/app/lib/lua/5.4/?.so;" .. package.cpath
+package.path = "/app/share/lua/5.4/?.lua;" .. package.path
+
+local lfs = require "lfs"
 local lgi = require "lgi"
 
 local GLib = lgi.require "GLib"
