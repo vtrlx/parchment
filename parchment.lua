@@ -286,8 +286,8 @@ end
 -- SECTION: Text editor
 
 local editor = newclass(function(self)
-	local searchimg = Gtk.Image { icon_name = "system-search-symbolic" }
-	searchimg:add_css_class "parchment"
+	local search_image = Gtk.Image { icon_name = "system-search-symbolic" }
+	search_image:add_css_class "parchment"
 	local search_entry = Gtk.Text {
 		placeholder_text = "Find in file…",
 		hexpand = true,
@@ -309,11 +309,14 @@ local editor = newclass(function(self)
 		margin_end = 6,
 	}
 	matchnum_label:add_css_class "numeric"
+	function matchnum_label.on_notify.text()
+		matchnum_label.visible = #matchnum_label.text > 0
+	end
 	local sbox = Gtk.Box {
 		orientation = "HORIZONTAL",
 		css_name = "entry",
 	}
-	sbox:append(searchimg)
+	sbox:append(search_image)
 	sbox:append(search_entry)
 	sbox:append(search_clear)
 	sbox:append(matchnum_label)
@@ -332,6 +335,8 @@ local editor = newclass(function(self)
 	search_box:append(sbox)
 	search_box:append(prev_match)
 	search_box:append(next_match)
+	local replace_image = Gtk.Image { icon_name = "edit-find-replace-symbolic" }
+	replace_image:add_css_class "parchment"
 	local replace_entry = Gtk.Text {
 		placeholder_text = "Replace with…",
 		hexpand = true,
@@ -351,6 +356,7 @@ local editor = newclass(function(self)
 		css_name = "entry",
 		orientation = "HORIZONTAL",
 	}
+	rbox:append(replace_image)
 	rbox:append(replace_entry)
 	rbox:append(replace_clear)
 	local replace_button = Gtk.Button {
@@ -426,11 +432,11 @@ local editor = newclass(function(self)
 		matchnum = matchnum_label,
 	}
 	self.tv = text_view
-	self.scroll = scrolled_win
-	self.widget = box
 	function self.tv.buffer.on_modified_changed()
 		self:update_title()
 	end
+	self.scroll = scrolled_win
+	self.widget = box
 	local function refresh_repl_buttons()
 		if self:selection_has_match() and not self:match_selected() then
 			replace_button.visible = false
@@ -458,7 +464,7 @@ local editor = newclass(function(self)
 		refresh_repl_buttons()
 	end
 	local function dosearch()
-		-- Skip searching if nothing is written.
+		if not search_bar.search_mode_enabled then return end
 		if #search_entry.text == 0 then
 			matchnum_label.label = ""
 			search_clear.visible = false
@@ -491,6 +497,12 @@ local editor = newclass(function(self)
 		self:replace_all(search_entry.text, replace_entry.text)
 		refresh_repl_buttons()
 	end
+--[[
+	This next line in particular may be the single most expensive operation in the entire application. It performs a search every single time the file's contents change while the search bar is visible. This is the single factor that hamper's Parchment's performance when dealing with large files.
+	As a benchmark, on a Core i7 laptop using a balanced power profile, in a file with 200,000 lines of text, I had no problem typing text with the search mode turned off. With search enabled, and with an active query, Parchment would sometimes take a fraction of a second to show newly-typed text—but never dropped any keyboard inputs. This is a use case that is far, far beyond what Parchment is expected to support, and this code still works acceptably well. In fact, GtkTextView appears to have a harder time coping with large amounts of text than the find function does.
+	It's believed that the reason for the find function's excellent performance is that it uses Lua's string search functions, which are optimized to work especially well for long strings of text.
+]]--
+	self.tv.buffer.on_changed = dosearch
 	search_entry.buffer.on_notify.text = dosearch
 	replace_entry.buffer.on_notify.text = replchanged
 	prev_match.on_clicked = prev
@@ -579,10 +591,6 @@ local function save_file_dialog(window, e)
 		initial_folder = Gio.File.new_for_path(dir),
 		filters = filefilters,
 	}
-	local cancellable = Gio.Cancellable {}
-	function cancellable:on_cancelled()
-		file_dialog:close()
-	end
 	local function on_save(src, res)
 		local file = file_dialog:save_finish(res)
 		if not file then return end
@@ -591,7 +599,7 @@ local function save_file_dialog(window, e)
 		file_dialog_path = dir
 		e:save(path)
 	end
-	file_dialog:save(window, cancellable, on_save)
+	file_dialog:save(window, nil, on_save)
 end
 
 -- SECTION: Application menus
@@ -1207,10 +1215,12 @@ end
 
 function editor:selection_replace(str)
 	assert(type(str) == "string")
+	self.tv.buffer:begin_user_action()
 	local first, second = self:get_iters()
 	self.tv.buffer:delete(first, second)
 	local offset = second:get_offset()
 	self.tv.buffer:insert(second, str, #str)
+	self.tv.buffer:end_user_action()
 	first = self.tv.buffer:get_iter_at_offset(offset)
 	self:set_iters(first, second)
 end
@@ -1481,7 +1491,9 @@ function editor:replace_all(pattern, repl)
 	local text = self.tv.buffer.text
 	local vadj = self.scroll.vadjustment
 	local ratio = (vadj.value - vadj.lower) / (vadj.upper - vadj.lower)
+	self.tv.buffer:begin_user_action()
 	self.tv.buffer.text = text:gsub(pattern, repl)
+	self.tv.buffer:end_user_action()
 	GLib.timeout_add(GLib.PRIORITY_DEFAULT, 10, function()
 		vadj.value = (vadj.upper - vadj.lower) * ratio + vadj.lower
 	end)
