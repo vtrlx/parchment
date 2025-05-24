@@ -1128,10 +1128,7 @@ local function buffer_read_file(buffer, file_path)
 			return fail
 		end
 		for line in hdl:lines() do
-			if line:match "\0" then
-				buffer:end_irreversible_action()
-				return fail
-			end
+			assert(not line:match "\0")
 			line = line:gsub("%s*$", "\n")
 			buffer:insert(buffer:get_end_iter(), line, #line)
 		end
@@ -1158,6 +1155,7 @@ end
 local function buffer_write_file(buffer, file_path)
 	local errmsg
 	local file = io.open(file_path, "w")
+	if not file then return fail end
 	local text = buffer.text:match ".*[^\n]"
 	for line in text:gmatch "[^\n]*" do
 		line = line:gsub("%s*$", "\n")
@@ -1168,7 +1166,7 @@ local function buffer_write_file(buffer, file_path)
 		buffer:set_modified(false)
 	end
 	file:close()
-	return success
+	return success, err
 end
 
 function editor:get_insert()
@@ -1265,6 +1263,7 @@ end
 
 function editor:set_file_path(path)
 	local oldpath = self:get_path_info()
+	if path == oldpath then return end
 	assert(path and type(path) == "string")
 	assert(not lib.is_dir(path))
 	local abspath = lib.absolute_path(path)
@@ -1294,6 +1293,43 @@ function editor:edit_file(path)
 	return buffer_read_file(self.tv.buffer, path)
 end
 
+function editor:warn_save_error()
+	local reason
+	local path, dir, name = self:get_path_info()
+	local dir_attrs = lfs.attributes(dir)
+	local file_attrs = lfs.attributes(path)
+	if not dir_attrs then
+		reason = "the destination folder does not exist"
+	elseif not dir_attrs.permissions:match "w" then
+		reason = "the destination folder is read-only"
+	elseif not file_attrs then
+		reason = "of an error with the destination folder"
+	elseif file_attrs.mode ~= "file" then
+		reason = "the destination path is not a file"
+	elseif not file_attrs.permissions:match "w" then
+		reason = "the destination file is read-only"
+	else
+		reason = "of an unknown error"
+	end
+	local template = "The file “%s” could not be saved because %s."
+	local body = template:format(name, reason)
+	local dlg = Adw.AlertDialog.new("Could not write file", body)
+	dlg:add_response("keep", "Don't save")
+	dlg:set_response_appearance("keep", "DEFAULT")
+	dlg:add_response("save", "Try again")
+	dlg:set_response_appearance("save", "DEFAULT")
+	dlg:add_response("save-as", "Save as…")
+	dlg:set_response_appearance("save-as", "SUGGESTED")
+	local window = app.active_window
+	function dlg.on_response(dlg, response)
+		if response == "save" then self:save(path) end
+		if response == "save-as" then
+			save_file_dialog(window, self)
+		end
+	end
+	dlg:choose(window)
+end
+
 function editor:save(path)
 	local oldpath = self:get_path_info()
 	if path then self:set_file_path(path) end
@@ -1304,27 +1340,40 @@ function editor:save(path)
 	local attrs, modtime
 	if lib.file_exists(path) then
 		attrs = lfs.attributes(path)
+		if attrs.mode ~= "file" then
+			self:warn_save_error()
+			return
+		end
 		modtime = attrs.modification
 	end
 	local function dosave()
 		local success = buffer_write_file(self.tv.buffer, path)
-		if not success then error(err) end
+		if not success then
+			self:warn_save_error(path)
+			return
+		end
 		attrs = lfs.attributes(path)
 		self.modtime = attrs.modification
 		self:update_title()
 	end
 	if samepath and self.modtime and modtime and modtime > self.modtime then
-		local bodyfmt = "The file %q has been modified by another application since it was opened. Saving will overwrite those modifications."
+		local bodyfmt = "The file “%s” has been modified by another application since it was opened. Saving will overwrite those modifications."
 		local body = bodyfmt:format(name)
 		local dlg = Adw.AlertDialog.new("Overwrite file?", body)
 		dlg:add_response("keep", "Don't save")
 		dlg:set_response_appearance("keep", "DEFAULT")
 		dlg:add_response("save", "Overwrite")
-		dlg:set_response_appearance("save", "SUGGESTED")
+		dlg:set_response_appearance("save", "DESTRUCTIVE")
+		dlg:add_response("save-as", "Save as…")
+		dlg:set_response_appearance("save-as", "SUGGESTED")
+		local window = app.active_window
 		function dlg:on_response(response)
 			if response == "save" then dosave() end
+			if response == "save-as" then
+				save_file_dialog(window, e)
+			end
 		end
-		dlg:choose(app.active_window)
+		dlg:choose(window)
 	else
 		dosave()
 	end
@@ -1479,7 +1528,7 @@ function editor:replace_in_selection(pattern, repl)
 	local vadj = self.scroll.vadjustment
 	local ratio = (vadj.value - vadj.lower) / (vadj.upper - vadj.lower)
 	self:selection_replace(text:gsub(pattern,repl))
-	GLib.timeout_add(GLib.PRIORITY_DEFAULT, 10, function()
+	GLib.timeout_add(GLib.PRIORITY_DEFAULT, 15, function()
 		vadj.value = (vadj.upper - vadj.lower) * ratio + vadj.lower
 	end)
 end
@@ -1494,7 +1543,7 @@ function editor:replace_all(pattern, repl)
 	self.tv.buffer:begin_user_action()
 	self.tv.buffer.text = text:gsub(pattern, repl)
 	self.tv.buffer:end_user_action()
-	GLib.timeout_add(GLib.PRIORITY_DEFAULT, 10, function()
+	GLib.timeout_add(GLib.PRIORITY_DEFAULT, 15, function()
 		vadj.value = (vadj.upper - vadj.lower) * ratio + vadj.lower
 	end)
 end
