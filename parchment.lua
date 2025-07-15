@@ -1549,8 +1549,8 @@ function editor:replace_all(pattern, repl)
 end
 
 function editor:begin_jumpover()
-	self:scroll_to_selection()
 	self.scroll.kinetic_scrolling = false
+	self:scroll_to_selection()
 	local _, second = self:get_iters()
 	local lineno = second:get_line() + 1
 	local lines = self.tv.buffer:get_line_count()
