@@ -122,15 +122,15 @@ package.cpath = "/app/lib/lua/5.4/?.so;" .. package.cpath
 package.path = "/app/share/lua/5.4/?.lua;" .. package.path
 
 local lfs = require "lfs"
-local lgi = require "lgi"
+local LuaGObject = require "LuaGObject"
 
-local GLib = lgi.require "GLib"
-local Gio = lgi.require "Gio"
-local Adw = lgi.require "Adw"
-local Gtk = lgi.require "Gtk"
-local Gdk = lgi.require "Gdk"
+local GLib = LuaGObject.require "GLib"
+local Gio = LuaGObject.require "Gio"
+local Adw = LuaGObject.require "Adw"
+local Gtk = LuaGObject.require "Gtk"
+local Gdk = LuaGObject.require "Gdk"
 
-local Parchment = lgi.package "Parchment"
+local Parchment = LuaGObject.package "Parchment"
 
 local app_id = lib.get_app_id()
 local is_devel = lib.get_is_devel()

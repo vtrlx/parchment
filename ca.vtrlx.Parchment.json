@@ -1,7 +1,7 @@
 {
 	"app-id": "ca.vtrlx.Parchment",
 	"runtime": "org.gnome.Platform",
-	"runtime-version": "47",
+	"runtime-version": "48",
 	"sdk": "org.gnome.Sdk",
 	"command": "parchment",
 	"finish-args": [
@@ -14,11 +14,8 @@
 	],
 	"modules": [{
 		"name": "lua",
-		"buildsystem": "simple",
-		"build-commands": [
-			"make",
-			"make install INSTALL_TOP=/app"
-		],
+		"no-autogen": true,
+		"make-install-args": ["INSTALL_TOP=/app"],
 		"sources": [{
 			"type": "archive",
 			"url": "https://lua.org/ftp/lua-5.4.7.tar.gz",
@@ -26,35 +23,29 @@
 		}]
 	}, {
 		"name": "lfs",
-		"buildsystem": "simple",
-		"build-commands": [
-			"make LUA_VERSION=5.4",
-			"make install PREFIX=/app LUA_VERSION=5.4"
-		],
+		"no-autogen": true,
+		"make-args": ["LUA_VERSION=5.4"],
+		"make-install-args": ["LUA_VERSION=5.4", "PREFIX=/app"],
 		"sources": [{
-			"type": "archive",
-			"url": "https://github.com/lunarmodules/luafilesystem/archive/refs/tags/v1_8_0.zip",
-			"sha256": "e3a6beca7a8a90522eed31db6ccdc5ed65a433826500c6862784e27671b9e18a"
+			"type": "git",
+			"url": "https://github.com/lunarmodules/luafilesystem",
+			"tag": "v1_8_0",
+			"commit": "7c6e1b013caec0602ca4796df3b1d7253a2dd258"
 		}]
 	}, {
-		"name": "lgi",
-		"buildsystem": "simple",
-		"build-commands": [
-			"make -C lgi LUA_VERSION=5.4",
-			"make -C lgi install LUA_VERSION=5.4 PREFIX=/app"
-		],
+		"name": "LuaGObject",
+		"no-autogen": true,
+		"subdir": "LuaGObject",
+		"make-args": ["LUA_VERSION=5.4"],
+		"make-install-args": ["LUA_VERSION=5.4", "PREFIX=/app"],
 		"sources": [{
-			"type": "archive",
-			"url": "https://github.com/lgi-devs/lgi/archive/e06ad94c8a1c84e3cdb80cee293450a280dfcbc7.zip",
-			"sha256": "003984a7a33236cc2368bf8c87905b6867d1292f844df236051a7b45f134d272"
+			"type": "git",
+			"url": "https://github.com/vtrlx/LuaGObject",
+			"commit": "6899bf98b6995c4ebb1ae52b8da5565c485c29ef"
 		}]
 	}, {
 		"name": "parchment",
-		"buildsystem": "simple",
-		"build-commands": [
-			"make",
-			"make install"
-		],
+		"no-autogen": true,
 		"sources": [{
 			"type": "dir",
 			"path": "."
