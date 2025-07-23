@@ -566,8 +566,8 @@ local function open_file_dialog(window)
 		initial_folder = Gio.File.new_for_path(dir),
 		filters = filefilters,
 	}
-	local function on_open(src, res)
-		local list = file_dialog:open_multiple_finish(res)
+	Gio.Async.start(function()
+		local list = file_dialog:async_open_multiple(window)
 		if not list then return end
 		for i = 1, list.n_items do
 			-- Gio's API documents says that ListModel's :get_item() method is not available to language bindings and to use :get_object() instead. That's not the case for LGI, which binds :get_item() and returns the object itself instead of a pointer.
@@ -577,8 +577,7 @@ local function open_file_dialog(window)
 			end
 			open_file(file:get_path())
 		end
-	end
-	file_dialog:open_multiple(window, nil, on_open)
+	end)() -- Calls wrapped async
 end
 
 local function save_file_dialog(window, e)
@@ -591,15 +590,14 @@ local function save_file_dialog(window, e)
 		initial_folder = Gio.File.new_for_path(dir),
 		filters = filefilters,
 	}
-	local function on_save(src, res)
-		local file = file_dialog:save_finish(res)
+	Gio.Async.start(function()
+		local file = file_dialog:async_save(window)
 		if not file then return end
 		local path = file:get_path()
 		local dir, _ = lib.dir_and_file(path)
 		file_dialog_path = dir
 		e:save(path)
-	end
-	file_dialog:save(window, nil, on_save)
+	end)() -- Calls wrapped async
 end
 
 -- SECTION: Application menus
