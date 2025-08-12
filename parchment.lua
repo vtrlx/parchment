@@ -286,8 +286,6 @@ end
 -- SECTION: Text editor
 
 local editor = newclass(function(self)
-	local search_image = Gtk.Image { icon_name = "system-search-symbolic" }
-	search_image:add_css_class "parchment"
 	local search_entry = Gtk.Text {
 		placeholder_text = "Find in file…",
 		hexpand = true,
@@ -297,29 +295,32 @@ local editor = newclass(function(self)
 		icon_name = "edit-clear-symbolic",
 		margin_start = 12,
 		visible = false,
+		on_clicked = function()
+			search_entry.text = ""
+			search_entry:grab_focus()
+		end,
 	}
-	function search_clear:on_clicked()
-		search_entry.text = ""
-		search_entry:grab_focus()
-	end
 	local matchnum_label = Gtk.Label {
+		css_classes = { "numeric" },
 		halign = "END",
 		hexpand = false,
 		margin_start = 6,
 		margin_end = 6,
 	}
-	matchnum_label:add_css_class "numeric"
 	function matchnum_label.on_notify.text()
 		matchnum_label.visible = #matchnum_label.text > 0
 	end
 	local sbox = Gtk.Box {
 		orientation = "HORIZONTAL",
 		css_name = "entry",
+		Gtk.Image {
+			css_classes = { "parchment" },
+			icon_name = "system-search-symbolic",
+		},
+		search_entry,
+		search_clear,
+		matchnum_label,
 	}
-	sbox:append(search_image)
-	sbox:append(search_entry)
-	sbox:append(search_clear)
-	sbox:append(matchnum_label)
 	local prev_match = Gtk.Button {
 		icon_name = "go-up-symbolic",
 		tooltip_text = "Go to previous match",
@@ -330,13 +331,15 @@ local editor = newclass(function(self)
 	}
 	local search_box = Gtk.Box {
 		orientation = "HORIZONTAL",
+		css_classes = { "linked" },
+		sbox,
+		prev_match,
+		next_match,
 	}
-	search_box:add_css_class "linked"
-	search_box:append(sbox)
-	search_box:append(prev_match)
-	search_box:append(next_match)
-	local replace_image = Gtk.Image { icon_name = "edit-find-replace-symbolic" }
-	replace_image:add_css_class "parchment"
+	local replace_image = Gtk.Image {
+		css_classes = { "parchment" },
+		icon_name = "edit-find-replace-symbolic",
+	}
 	local replace_entry = Gtk.Text {
 		placeholder_text = "Replace with…",
 		hexpand = true,
@@ -347,18 +350,18 @@ local editor = newclass(function(self)
 		margin_start = 12,
 		margin_end = 6,
 		visible = false,
+		on_clicked = function()
+			replace_entry.text = ""
+			replace_entry:grab_focus()
+		end,
 	}
-	function replace_clear:on_clicked()
-		replace_entry.text = ""
-		replace_entry:grab_focus()
-	end
 	local rbox = Gtk.Box {
 		css_name = "entry",
 		orientation = "HORIZONTAL",
+		replace_image,
+		replace_entry,
+		replace_clear,
 	}
-	rbox:append(replace_image)
-	rbox:append(replace_entry)
-	rbox:append(replace_clear)
 	local replace_button = Gtk.Button {
 		label = "Replace",
 		tooltip_text = "Replaces selected text",
@@ -374,18 +377,20 @@ local editor = newclass(function(self)
 		tooltip_text = "Replaces all matches in file",
 		sensitive = false,
 	}
-	local replace_box = Gtk.Box { orientation = "HORIZONTAL" }
-	replace_box:add_css_class "linked"
-	replace_box:append(rbox)
-	replace_box:append(replace_button)
-	replace_box:append(replace_in_sel_button)
-	replace_box:append(replace_all_button)
+	local replace_box = Gtk.Box {
+		orientation = "HORIZONTAL",
+		css_classes = { "linked" },
+		rbox,
+		replace_button,
+		replace_in_sel_button,
+		replace_all_button,
+	}
 	local search_bar_box = Gtk.Box {
 		orientation = "VERTICAL",
 		spacing = 6,
+		search_box,
+		replace_box,
 	}
-	search_bar_box:append(search_box)
-	search_bar_box:append(replace_box)
 	local search_bar_clamp = Adw.Clamp {
 		orientation = "HORIZONTAL",
 		child = search_bar_box,
@@ -401,6 +406,7 @@ local editor = newclass(function(self)
 	local _, pixels = get_zoom_dimensions(currentzoom)
 	local above, below = math.floor(pixels / 2), math.ceil(pixels / 2)
 	local text_view = Gtk.TextView {
+		css_classes = { "parchment", "numeric" },
 		top_margin = 12,
 		bottom_margin = 400,
 		left_margin = 24,
@@ -411,8 +417,6 @@ local editor = newclass(function(self)
 		layout_manager = Parchment.EditorLayoutManager(),
 		wrap_mode = Gtk.WrapMode.WORD_CHAR,
 	}
-	text_view:add_css_class "numeric"
-	text_view:add_css_class "parchment"
 	text_view.buffer:set_max_undo_levels(0)
 	local scrolled_win = Gtk.ScrolledWindow {
 		hscrollbar_policy = "NEVER",
@@ -421,9 +425,9 @@ local editor = newclass(function(self)
 	}
 	local box = Gtk.Box {
 		orientation = "VERTICAL",
+		search_bar,
+		scrolled_win,
 	}
-	box:append(search_bar)
-	box:append(scrolled_win)
 	self.matches = {}
 	self.search = {
 		entry = search_entry,
@@ -782,32 +786,30 @@ local function new_window()
 	local zoompercent = zoomlevels[currentzoom].label
 	local zoom_reset_button = Gtk.Button {
 		action_name = "app.zoom-reset",
+		css_classes = { "numeric" },
 		hexpand = true,
 		label = zoompercent,
 		tooltip_text = "Reset zoom to 100%",
 		width_request = 100,
 	}
-	zoom_reset_button:add_css_class "numeric"
 
-	local zoom_label = Gtk.Label {
-		label = "Zoom",
-		margin_start = 12,
-	}
-	local zoom_buttons = Gtk.Box {
-		orientation = "HORIZONTAL",
-		halign = "END",
-		margin_start = 64,
-	}
-	zoom_buttons:add_css_class "linked"
-	zoom_buttons:append(zoom_out_button)
-	zoom_buttons:append(zoom_reset_button)
-	zoom_buttons:append(zoom_in_button)
 	local zoom_box = Gtk.Box {
 		orientation = "HORIZONTAL",
 		hexpand = true,
+		Gtk.Label {
+			label = "Zoom",
+			margin_start = 12,
+		},
+		Gtk.Box {
+			orientation = "HORIZONTAL",
+			halign = "END",
+			margin_start = 64,
+			css_classes = { "linked" },
+			zoom_out_button,
+			zoom_reset_button,
+			zoom_in_button,
+		},
 	}
-	zoom_box:append(zoom_label)
-	zoom_box:append(zoom_buttons)
 
 	local burger_popover = Gtk.PopoverMenu.new_from_model(burger_menu)
 	burger_popover.halign = "END"
@@ -846,12 +848,10 @@ local function new_window()
 		title_widget = window_title,
 		show_start_title_buttons = false,
 		valign = "START",
+		start_packs = { new_tab_button, open_file_button, save_button },
+		end_packs = { menu_button },
+		-- end_packs = { menu_button, tab_button },
 	}
-	content_header:pack_start(new_tab_button)
-	content_header:pack_start(open_file_button)
-	content_header:pack_start(save_button)
-	content_header:pack_end(menu_button)
---	content_header:pack_end(tab_button)
 
 	local tab_bar = Adw.TabBar {
 		autohide = true,
@@ -861,9 +861,8 @@ local function new_window()
 	local content = Adw.ToolbarView {
 		content = tab_view,
 		top_bar_style = "FLAT",
+		top_bars = { content_header, tab_bar },
 	}
-	content:add_top_bar(content_header)
-	content:add_top_bar(tab_bar)
 
 	-- This is disabled as it is currently broken by Gtk.TextView causing resize events during its snapshot phase, which when used as a child of Adw.TabOverview leads to the entire tab contents visually freezing until switching to a new tab. Worse still, to fix this requires a breaking change in Gtk and Gtk.SourceView, so the fix must be coordinated downstream with distros.
 --[[
@@ -1566,9 +1565,9 @@ function editor:begin_jumpover()
 	local box = Gtk.Box {
 		orientation = "VERTICAL",
 		spacing = 6,
+		linelabel,
+		lineentry,
 	}
-	box:append(linelabel)
-	box:append(lineentry)
 	local popover = Gtk.Popover {
 		child = box,
 		pointing_to = self:selection_rect(),

@@ -36,12 +36,11 @@
 		"name": "LuaGObject",
 		"no-autogen": true,
 		"subdir": "LuaGObject",
-		"make-args": ["LUA_VERSION=5.4"],
 		"make-install-args": ["LUA_VERSION=5.4", "PREFIX=/app"],
 		"sources": [{
 			"type": "git",
 			"url": "https://github.com/vtrlx/LuaGObject",
-			"tag": "0.10.0"
+			"commit": "2afedf7cbaffa4203c9f2550e4c5a07cf3a2128a"
 		}]
 	}, {
 		"name": "parchment",
