@@ -1153,7 +1153,7 @@ local function buffer_write_file(buffer, file_path)
 	local errmsg
 	local file = io.open(file_path, "w")
 	if not file then return fail end
-	local text = buffer.text:match ".*[^\n]"
+	local text = buffer.text:match ".*[^\n]" or ""
 	for line in text:gmatch "[^\n]*" do
 		line = line:gsub("%s*$", "\n")
 		file:write(line)
