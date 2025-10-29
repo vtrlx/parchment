@@ -2,7 +2,7 @@
 
 #	Parchment
 
-Simply write text.
+Just write.
 
 ##	Features
 
@@ -17,11 +17,11 @@ Parchment automatically performs a few technical things in order to provide a pl
 
 ####	Trailing Whitespace Removal
 
-Parchment automatically removes trailing whitespace on every line.
+When saving a file, Parchment automatically removes any whitespace characters at the end of each line.
 
 ####	End-of-File Newline Correction
 
-Parchment automatically ensures that all saved files end in exactly one newline character. Files saved by Parchment will work as expected in command-line applications.
+Parchment automatically ensures that all saved files end with exactly one newline character. This means that files saved by Parchment will work correct when using command-line applications.
 
 ####	Text Files Only
 
@@ -36,13 +36,13 @@ Parchment refuses to open files which aren't valid UTF-8.
 Parchment compiles with [Flatpak Builder](https://docs.flatpak.org/en/latest/flatpak-builder.html).
 
 ```sh
-flatpak-builder .build ca.vtrlx.Parchment.json --user --install --force-clean
+flatpak-builder build ca.vtrlx.Parchment.json --user --install --force-clean
 flatpak run ca.vtrlx.Parchment
 ```
 
 To build and run the development version, add `.Devel` after the application's name.
 
 ```sh
-flatpak-builder .build ca.vtrlx.Parchment.Devel.json --user --install --force-clean
+flatpak-builder build ca.vtrlx.Parchment.Devel.json --user --install --force-clean
 flatpak run ca.vtrlx.Parchment.Devel
 ```
