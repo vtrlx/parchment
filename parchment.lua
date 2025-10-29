@@ -129,6 +129,7 @@ local Gio = LuaGObject.require "Gio"
 local Adw = LuaGObject.require "Adw"
 local Gtk = LuaGObject.require "Gtk"
 local Gdk = LuaGObject.require "Gdk"
+local Pango = LuaGObject.require "Pango"
 
 local Parchment = LuaGObject.package "Parchment"
 
@@ -138,11 +139,10 @@ local app_title = "Parchment"
 local app_version = lib.get_app_ver()
 local app  = Adw.Application {
 	application_id = app_id,
-	flags = Gio.ApplicationFlags.HANDLES_OPEN | Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
+	flags = { "HANDLES_OPEN", "HANDLES_COMMAND_LINE" },
 }
 
 app:add_main_option("new-window", string.byte "n", "IN_MAIN", "NONE", "Create a new window.")
-app:add_main_option("wait-done", string.byte "k", "IN_MAIN", "NONE", "Wait until the given files have been closed.")
 
 -- Shortcuts from the GNOME HIG (https://developer.gnome.org/hig/reference/keyboard.html)
 local accels = {
@@ -166,7 +166,7 @@ end
 
 local lerror = error
 local function error(...)
-	local msg = table.concat({ ... }, " ")
+	local msg = table.concat({ ... }, "	")
 	local dlg = Adw.AlertDialog.new("Error", msg)
 	dlg:add_response("cancel", "Continue")
 	dlg:choose()
@@ -182,23 +182,24 @@ local window_widgets = {}
 
 local zoomlevels = {
 	current = 3,
-	{ label = "75%", factor = 0.75 },
-	{ label = "90%", factor = 0.9 },
+	-- The use of fractions for the factor ensures total precision.
+	{ label = "75%", factor = 3/4 },
+	{ label = "90%", factor = 9/10 },
 	{ label = "100%", factor = 1 },
-	{ label = "110%", factor = 1.1 },
-	{ label = "125%", factor = 1.25 },
+	{ label = "110%", factor = 11/10 },
+	{ label = "125%", factor = 5/4 },
 	{ label = "133%", factor = 4/3 },
-	{ label = "150%", factor = 1.5 },
+	{ label = "150%", factor = 3/2 },
 	{ label = "166%", factor = 5/3 },
-	{ label = "180%", factor = 1.8 },
+	{ label = "180%", factor = 9/5 },
 	{ label = "200%", factor = 2 },
 }
 
-local function get_zoom_dimensions(level)
+local function get_zoom_dimensions(level, fontsize)
 	assert(type(level) == "number" and level % 1 == 0)
 	assert(level >= 1 and level <= #zoomlevels)
 	local factor = zoomlevels[level].factor
-	local points = 11 * factor
+	local points = (fontsize or 11) * factor / 1024
 	local pixels = 8 * factor
 	local width = 640 * factor
 	local margin = 24 * factor
@@ -207,32 +208,40 @@ end
 
 local css_template = [[
 textview.parchment {
-	font-size: %fpt;
+	font-family: %s;
+	font-size: %f%s;
 }
 
-/* The Gtk.Image class becomes more opaque when hovered, indicating an action. This change prevents that. */
+/* The Gtk.Image class always becomes more opaque when hovered, which suggests that it is actionable even when not. This CSS prevents that from occurring. */
 image.parchment:hover {
 	opacity: 0.7;
 }
 ]]
 
+local styleman = Adw.StyleManager.get_default()
+
 local css_providers = {}
-do -- Set up CSS providers for each zoom level.
+for i = 1, #zoomlevels do table.insert(css_providers, Gtk.CssProvider()) end
+
+function build_css_providers()
+	local docfontname = styleman.document_font_name
+	local fontdesc = Pango.FontDescription.from_string(docfontname)
+	local fontfam, fontsize = fontdesc:get_family(), fontdesc:get_size()
+	local fontunit = fontdesc:get_size_is_absolute() and "px" or "pt"
 	for i = 1, #zoomlevels do
-		local points = get_zoom_dimensions(i)
-		local css = css_template:format(points)
-		local provider = Gtk.CssProvider()
-		provider:load_from_string(css)
-		table.insert(css_providers, provider)
+		local points = get_zoom_dimensions(i, fontsize)
+		local css = css_template:format(fontfam, points, fontunit)
+		css_providers[i]:load_from_string(css)
 	end
 end
 
 local function refresh_zoom(previous)
 	local display = Gdk.Display.get_default()
-	if previous then
+	if previous and css_providers[previous] then
 		local oldprovider = css_providers[previous]
 		Gtk.StyleContext.remove_provider_for_display(display, oldprovider)
 	end
+	build_css_providers()
 	local currentzoom = zoomlevels.current
 	local newprovider = css_providers[currentzoom]
 	Gtk.StyleContext.add_provider_for_display(display, newprovider, 1000000)
@@ -244,7 +253,9 @@ local function refresh_zoom(previous)
 	end
 end
 
--- Ensure that the default is active when starting up.
+styleman.on_notify["document-font-name"] = refresh_zoom
+
+-- Ensure that the default zoom level is active when starting up.
 refresh_zoom()
 
 local function zoom_out()
@@ -406,7 +417,7 @@ local editor = newclass(function(self)
 	local _, pixels = get_zoom_dimensions(currentzoom)
 	local above, below = math.floor(pixels / 2), math.ceil(pixels / 2)
 	local text_view = Gtk.TextView {
-		css_classes = { "parchment", "numeric" },
+		css_classes = { "parchment", "numeric", "view" },
 		top_margin = 12,
 		bottom_margin = 400,
 		left_margin = 24,
@@ -878,7 +889,7 @@ local function new_window()
 	window.title = app_title
 	window:set_default_size(640, 720)
 	window.width_request = 480
-	window.height_request = 480
+	window.height_request = 240
 
 	function tab_view:on_page_attached(page)
 		local e = editors[page.child]
