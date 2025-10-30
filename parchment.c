@@ -66,34 +66,11 @@ get_cli_args_lua(lua_State *L)
 	return argc;
 }
 
-static int
-forkexec_lua(lua_State *L)
-/* Forks the process and then executes a given shell command. This function is used mainly to open the file browser. */
-{
-	const char *cmd;
-	char program[BUFSIZ] = {0};
-	char *args[4];
-	cmd = luaL_checkstring(L, 1);
-	if (!fork()) {
-		strcpy(program, cmd);
-		args[0] = "/usr/bin/sh";
-		args[1] = "-c";
-		/* Running in sh(1) lets us avoid breaking up parameters manually. */
-		args[2] = program;
-		args[3] = NULL;
-		execv("/usr/bin/sh", args);
-		/* If execv() fails, the thread needs to exit. Otherwise, chaotic and terrible things will occur with Gtk. */
-		exit(0);
-	}
-	return 0;
-}
-
 static const luaL_Reg parchmentlib[] = {
 	{ "get_is_devel", get_is_devel_lua },
 	{ "get_app_id", get_app_id_lua },
 	{ "get_app_ver", get_app_ver_lua },
 	{ "get_cli_args", get_cli_args_lua },
-	{ "forkexec", forkexec_lua },
 	/* sentinel item, marks the end of the array */
 	{ NULL, NULL },
 };

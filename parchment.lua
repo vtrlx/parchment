@@ -585,7 +585,7 @@ local function open_file_dialog(window)
 		local list = file_dialog:async_open_multiple(window)
 		if not list then return end
 		for i = 1, list.n_items do
-			-- Gio's API documents says that ListModel's :get_item() method is not available to language bindings and to use :get_object() instead. That's not the case for LGI, which binds :get_item() and returns the object itself instead of a pointer.
+			-- Gio's API documents say that ListModel's :get_item() method is not available to language bindings and to use :get_object() instead. That's not the case for LuaGObject, which binds :get_item() and returns the object itself instead of a pointer.
 			local file = list:get_item(i - 1)
 			if i == 1 then
 				file_dialog_path = file:get_parent():get_path()
@@ -1057,8 +1057,12 @@ local function new_window()
 	window_widgets[window].open_folder_action = add_new_action(window, "open-folder", function()
 		local e = get_focused_editor()
 		if not e or not e:has_file() then return end
-		local _, dir = e:get_path_info()
-		lib.forkexec(("xdg-open %q"):format(dir))
+		local path = e:get_path_info()
+		local file = Gio.File.new_for_path(path)
+		local launcher = Gtk.FileLauncher.new(file)
+		Gio.Async.start(function()
+			launcher:async_open_containing_folder()
+		end)() -- calls wrapped async
 	end)
 	window_widgets[window].open_folder_action.enabled = false
 
