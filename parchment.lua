@@ -149,6 +149,7 @@ local accels = {
 	["app.zoom-out"] = { "<Ctrl>minus" },
 	["app.zoom-reset"] = { "<Ctrl>equal" },
 	["app.zoom-in"] = { "<Ctrl><Shift>plus" },
+	["win.overview"] = { "<Ctrl><Shift>O" },
 	["win.new-file"] = { "<Ctrl>T" },
 	["win.open-file"] = { "<Ctrl>O" },
 	["win.new-window"] = {"<Ctrl>N" },
@@ -549,7 +550,9 @@ local function open_file(path)
 	editors[e.widget] = e
 	if path then editors[path] = e end
 	local page = tab_view:add_page(e.widget)
+	e:set_page(page)
 	tab_view:set_selected_page(page)
+	return page
 end
 
 local function get_focused_editor()
@@ -654,6 +657,11 @@ local function newshortwindow(parent)
 		action_name = "win.new-window",
 		title = "New window",
 		accelerator = "<Ctrl>N",
+	})
+	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
+		action_name = "win.overview",
+		title = "Open/close overview",
+		accelerator = "<Ctrl><Shift>O",
 	})
 	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
 		action_name = "win.shortcuts",
@@ -838,13 +846,11 @@ local function new_window()
 		return new_window()
 	end
 
---[[
 	local tab_button = Adw.TabButton {
 		action_name = "overview.open",
 		tooltip_text = "View all tabs",
 		view = tab_view,
 	}
-]]--
 
 	local save_button = Gtk.Button {
 		action_name = "win.save-file",
@@ -860,8 +866,8 @@ local function new_window()
 		show_start_title_buttons = false,
 		valign = "START",
 		start_packs = { new_tab_button, open_file_button, save_button },
-		end_packs = { menu_button },
-		-- end_packs = { menu_button, tab_button },
+		-- end_packs = { menu_button },
+		end_packs = { menu_button, tab_button },
 	}
 
 	local tab_bar = Adw.TabBar {
@@ -876,16 +882,18 @@ local function new_window()
 	}
 
 	-- This is disabled as it is currently broken by Gtk.TextView causing resize events during its snapshot phase, which when used as a child of Adw.TabOverview leads to the entire tab contents visually freezing until switching to a new tab. Worse still, to fix this requires a breaking change in Gtk and Gtk.SourceView, so the fix must be coordinated downstream with distros.
---[[
 	local tab_overview = Adw.TabOverview {
 		child = content,
 		view = tab_view,
+		enable_new_tab = true,
 	}
-]]--
+	function tab_overview:on_create_tab()
+		return open_file()
+	end
 
 	local window = Adw.ApplicationWindow.new(app)
---	window.content = tab_overview
-	window.content = content
+	window.content = tab_overview
+--	window.content = content
 	window.title = app_title
 	window:set_default_size(640, 720)
 	window.width_request = 480
@@ -1066,6 +1074,10 @@ local function new_window()
 	end)
 	window_widgets[window].open_folder_action.enabled = false
 
+	add_new_action(window, "overview", function()
+		tab_overview.open = not tab_overview.open
+	end)
+
 	add_new_action(window, "new-file", function()
 		open_file()
 	end)
@@ -1201,6 +1213,15 @@ function editor:set_iters(first, second)
 	first:order(second)
 	-- Yes, this is how TextBuffer:select_range() works.
 	self.tv.buffer:select_range(second, first)
+end
+
+function editor:set_page(page)
+	local vadj = self.scroll.vadjustment
+	function vadj.on_notify.value()
+		local value_adjusted = vadj.value - vadj.lower
+		local max_adjusted = vadj.upper - vadj.lower
+		page.thumbnail_yalign = value_adjusted / max_adjusted
+	end
 end
 
 function editor:scroll_to_selection()
