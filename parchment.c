@@ -17,7 +17,8 @@ You should have received a copy of the GNU General Public License along with thi
 #include <lauxlib.h>
 #include <lualib.h>
 
-#define VERSION "alpha"
+#define QUOTE(name) #name
+#define MSTR(macro) QUOTE(macro)
 
 static int
 get_is_devel_lua(lua_State *L)
@@ -45,7 +46,7 @@ static int
 get_app_ver_lua(lua_State *L)
 {
 #ifdef VERSION
-	lua_pushstring(L, VERSION);
+	lua_pushstring(L, MSTR(VERSION));
 #else
 #error("VERSION macro is not defined!")
 #endif

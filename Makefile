@@ -1,15 +1,18 @@
+PACKAGE = ca.vtrlx.Parchment
+VERSION = beta
+
 PREFIX = /app
 
 BIN = parchment
 CSRCS = parchment.c
 OBJS = parchment_bytecode.o
 LIBS = -llua -ldl -lm
-CFLAGS = $(LIBS) -Wl,-E
+CFLAGS = $(LIBS) -Wl,-E -DVERSION=$(VERSION)
 
-APPID = ca.vtrlx.Parchment
+APPID = $(PACKAGE)
 ifdef DEVEL
 CFLAGS += -DDEVEL
-APPID = ca.vtrlx.Parchment.Devel
+APPID = $(PACKAGE).Devel
 endif
 
 DESKTOP_FILE = $(APPID).desktop
