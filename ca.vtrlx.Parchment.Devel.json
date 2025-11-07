@@ -40,7 +40,7 @@
 		"sources": [{
 			"type": "git",
 			"url": "https://github.com/vtrlx/LuaGObject",
-			"tag": "0.10.1"
+			"tag": "0.10.2"
 		}]
 	}, {
 		"name": "parchment",
