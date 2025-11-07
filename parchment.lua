@@ -62,7 +62,7 @@ function lib.file_exists(file_name)
 	file_name = lib.absolute_path(file_name)
 	local ok, err, code = os.rename(file_name, file_name)
 	if not ok then
-		-- In Linux, error code 13 when moving a file means the it failed because the directory cannot be made its own child. Any other error means the file does not exist.
+		-- In Linux, error code 13 when moving a file means that it failed because the directory cannot be made its own child. Any other error means the file does not exist.
 		if code == 13 then
 			return true
 		end
@@ -639,106 +639,31 @@ burger_menu:append_section(nil, file_menu)
 burger_menu:append_section(nil, nav_menu)
 burger_menu:append_section(nil, app_menu)
 
-local function newshortwindow(parent)
-	local appgroup = Gtk.ShortcutsGroup {
+local shortcutsdialog = Adw.ShortcutsDialog {
+	Adw.ShortcutsSection {
 		title = "Parchment",
-	}
-	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.open-file",
-		title = "Open a file",
-		accelerator = "<Ctrl>O",
-	})
-	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.new-tab",
-		title = "New file",
-		accelerator = "<Ctrl>T",
-	})
-	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.new-window",
-		title = "New window",
-		accelerator = "<Ctrl>N",
-	})
-	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.overview",
-		title = "Open/close overview",
-		accelerator = "<Ctrl><Shift>O",
-	})
-	appgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.shortcuts",
-		title = "Keyboard shortcuts",
-		accelerator = "<Ctrl><Shift>question",
-	})
-
-	local editorgroup = Gtk.ShortcutsGroup {
+		Adw.ShortcutsItem.new_from_action("Open a file", "win.open-file"),
+		Adw.ShortcutsItem.new_from_action("New file", "win.new-file"),
+		Adw.ShortcutsItem.new_from_action("New window", "win.new-window"),
+		Adw.ShortcutsItem.new_from_action("Open/close overview", "win.overview"),
+		Adw.ShortcutsItem.new_from_action("Show keyboard shortcuts", "win.shortcuts"),
+	},
+	Adw.ShortcutsSection {
 		title = "Editor",
-	}
-	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.open-folder",
-		title = "Open in Files",
-		accelerator = "<Ctrl>D",
-	})
-	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.save-file",
-		title = "Save file",
-		accelerator = "<Ctrl>S",
-	})
-	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.save-file-as",
-		title = "Save file as",
-		accelerator = "<Ctrl><Shift>S",
-	})
-	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.search",
-		title = "Search in file",
-		accelerator = "<Ctrl>F",
-	})
-	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.goto",
-		title = "Go to line",
-		accelerator = "<Ctrl>I",
-	})
-	editorgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "win.close-tab",
-		title = "Close tab",
-		accelerator = "<Ctrl>W",
-	})
-
-	local zoomgroup = Gtk.ShortcutsGroup {
+		Adw.ShortcutsItem.new_from_action("Show in Files", "win.open-folder"),
+		Adw.ShortcutsItem.new_from_action("Save file", "win.save-file"),
+		Adw.ShortcutsItem.new_from_action("Save file as", "win.save-file-as"),
+		Adw.ShortcutsItem.new_from_action("Search in file", "win.search"),
+		Adw.ShortcutsItem.new_from_action("Go to line", "win.goto"),
+		Adw.ShortcutsItem.new_from_action("Close tab", "win.close-tab"),
+	},
+	Adw.ShortcutsSection {
 		title = "Zoom",
-	}
-	zoomgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "app.zoom-out",
-		title = "Zoom out",
-		accelerator = "<Ctrl>minus",
-	})
-	zoomgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "app.zoom-in",
-		title = "Zoom in",
-		accelerator = "<Ctrl><Shift>plus",
-	})
-	zoomgroup:add_shortcut(Gtk.ShortcutsShortcut {
-		action_name = "app.zoom-reset",
-		title = "Reset zoom level",
-		accelerator = "<Ctrl>equal",
-	})
-
-	local miscgroup = Gtk.ShortcutsGroup {
-		title = "Application",
-	}
-
-	local shortsection = Gtk.ShortcutsSection {
-		title = app_title
-	}
-	shortsection:add_group(appgroup)
-	shortsection:add_group(zoomgroup)
-	shortsection:add_group(editorgroup)
-	shortcutwin = Gtk.ShortcutsWindow()
-	shortcutwin:add_section(shortsection)
-	shortcutwin.transient_for = parent
-	shortcutwin.modal = true
-	shortcutwin.application = app
-	return shortcutwin
-end
+		Adw.ShortcutsItem.new_from_action("Zoom out", "app.zoom-out"),
+		Adw.ShortcutsItem.new_from_action("Zoom in", "app.zoom-in"),
+		Adw.ShortcutsItem.new_from_action("Reset zoom", "app.zoom-reset"),
+	},
+}
 
 local function about(parent)
 	local aboutdlg = Adw.AboutDialog {
@@ -1117,8 +1042,7 @@ local function new_window()
 	end)
 
 	add_new_action(window, "shortcuts", function()
-		local shortcutwin = newshortwindow(window)
-		shortcutwin:present()
+		shortcutsdialog:present(window)
 	end)
 
 	add_new_action(window, "about", function()
@@ -1674,6 +1598,7 @@ function app:on_activate()
 	if app.active_window then app.active_window:present() end
 end
 
+-- Handles opening a file from the command line, possibly in a new window of an existing Parchment instance.
 function app:on_command_line(cli)
 	local argv, argc = cli:get_arguments()
 	local files = {}
