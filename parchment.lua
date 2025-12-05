@@ -149,7 +149,6 @@ local accels = {
 	["app.zoom-out"] = { "<Ctrl>minus" },
 	["app.zoom-reset"] = { "<Ctrl>equal" },
 	["app.zoom-in"] = { "<Ctrl><Shift>plus" },
-	["win.overview"] = { "<Ctrl><Shift>O" },
 	["win.new-file"] = { "<Ctrl>T" },
 	["win.open-file"] = { "<Ctrl>O" },
 	["win.new-window"] = {"<Ctrl>N" },
@@ -295,6 +294,14 @@ function Parchment.EditorLayoutManager:do_allocate(widget, width, height, baseli
 	Gtk.TextView.do_size_allocate(widget, width, height, baseline)
 end
 
+-- SECTION: Text editor context menu
+
+local function editormenu()
+	local menu = Gio.Menu()
+	menu:append("Go to Line…", "win.goto")
+	return menu
+end
+
 -- SECTION: Text editor
 
 local editor = newclass(function(self)
@@ -428,6 +435,7 @@ local editor = newclass(function(self)
 		pixels_inside_wrap = 0,
 		layout_manager = Parchment.EditorLayoutManager(),
 		wrap_mode = Gtk.WrapMode.WORD_CHAR,
+		extra_menu = editormenu(),
 	}
 	text_view.buffer:set_max_undo_levels(0)
 	local scrolled_win = Gtk.ScrolledWindow {
@@ -550,9 +558,7 @@ local function open_file(path)
 	editors[e.widget] = e
 	if path then editors[path] = e end
 	local page = tab_view:add_page(e.widget)
-	e:set_page(page)
 	tab_view:set_selected_page(page)
-	return page
 end
 
 local function get_focused_editor()
@@ -771,17 +777,30 @@ local function new_window()
 		return new_window()
 	end
 
+--[[
 	local tab_button = Adw.TabButton {
 		action_name = "overview.open",
 		tooltip_text = "View all tabs",
 		view = tab_view,
 	}
+]]--
 
 	local save_button = Gtk.Button {
 		action_name = "win.save-file",
 		icon_name = "document-save-symbolic",
 		tooltip_text = "Save file",
 		visible = false,
+	}
+
+	local file_properties_button = Gtk.Button {
+		icon_name = "document-properties-symbolic",
+		tooltip_text = "Modify formatting…",
+		visible = false,
+		on_clicked = function()
+			local e = get_focused_editor()
+			if not e then return end
+			e:show_properties()
+		end,
 	}
 
 	local window_title = Adw.WindowTitle.new(app_title, "")
@@ -791,8 +810,8 @@ local function new_window()
 		show_start_title_buttons = false,
 		valign = "START",
 		start_packs = { new_tab_button, open_file_button, save_button },
-		-- end_packs = { menu_button },
-		end_packs = { menu_button, tab_button },
+		end_packs = { menu_button, file_properties_button },
+		-- end_packs = { menu_button, tab_button, file_properties_button },
 	}
 
 	local tab_bar = Adw.TabBar {
@@ -807,24 +826,23 @@ local function new_window()
 	}
 
 	-- This is disabled as it is currently broken by Gtk.TextView causing resize events during its snapshot phase, which when used as a child of Adw.TabOverview leads to the entire tab contents visually freezing until switching to a new tab. Worse still, to fix this requires a breaking change in Gtk and Gtk.SourceView, so the fix must be coordinated downstream with distros.
+--[[
 	local tab_overview = Adw.TabOverview {
 		child = content,
 		view = tab_view,
-		enable_new_tab = true,
 	}
-	function tab_overview:on_create_tab()
-		return open_file()
-	end
+]]--
 
 	local window = Adw.ApplicationWindow.new(app)
-	window.content = tab_overview
---	window.content = content
+--	window.content = tab_overview
+	window.content = content
 	window.title = app_title
 	window:set_default_size(640, 720)
 	window.width_request = 480
 	window.height_request = 240
 
 	function tab_view:on_page_attached(page)
+		file_properties_button.visible = true
 		local e = editors[page.child]
 		if not e then return end
 		content.top_bar_style = "RAISED_BORDER"
@@ -846,6 +864,8 @@ local function new_window()
 					window_widgets[window].open_folder_action.enabled = true
 				end
 			end
+		end
+		function e:set_search_mode()
 		end
 		function e:grab_focus()
 			window:activate()
@@ -916,6 +936,7 @@ local function new_window()
 				window_title:set_title(app_title)
 				window_title:set_subtitle ""
 				save_button.visible = false
+				file_properties_button.visible = false
 				content.top_bar_style = "FLAT"
 				if window_widgets[window] then
 					window_widgets[window].open_folder_action.enabled = false
@@ -998,10 +1019,6 @@ local function new_window()
 		end)() -- calls wrapped async
 	end)
 	window_widgets[window].open_folder_action.enabled = false
-
-	add_new_action(window, "overview", function()
-		tab_overview.open = not tab_overview.open
-	end)
 
 	add_new_action(window, "new-file", function()
 		open_file()
@@ -1139,15 +1156,6 @@ function editor:set_iters(first, second)
 	self.tv.buffer:select_range(second, first)
 end
 
-function editor:set_page(page)
-	local vadj = self.scroll.vadjustment
-	function vadj.on_notify.value()
-		local value_adjusted = vadj.value - vadj.lower
-		local max_adjusted = vadj.upper - vadj.lower
-		page.thumbnail_yalign = value_adjusted / max_adjusted
-	end
-end
-
 function editor:scroll_to_selection()
 	self.tv:scroll_to_mark(self:get_bound(), 0.4999, false, 0.0, 0.0)
 	self.tv:scroll_to_mark(self:get_insert(), 0.2, false, 0.0, 0.0)
@@ -1212,6 +1220,10 @@ end
 function editor:get_path_info()
 	if not self:has_file() then return end
 	return self.file_dir .. "/" .. self.file_name, self.file_dir, self.file_name
+end
+
+function editor:update_search_mode()
+	self:set_search_mode(self.search.bar.search_mode_enabled)
 end
 
 function editor:has_file()
@@ -1372,6 +1384,7 @@ end
 
 -- Lua is excellent at processing long strings, and in my experience this implementation is fast enough for most use cases.
 function editor:findall(pattern)
+	if #pattern == 0 then return end
 	local byte_indices = {}
 	local text = self.tv.buffer.text
 	local len = #text
@@ -1503,6 +1516,107 @@ function editor:replace_all(pattern, repl)
 	GLib.timeout_add(GLib.PRIORITY_DEFAULT, 15, function()
 		vadj.value = (vadj.upper - vadj.lower) * ratio + vadj.lower
 	end)
+end
+
+function editor:fixindent(spaces)
+	assert(type(spaces) == "number")
+	assert(spaces > 0)
+	self.tv.buffer:begin_user_action()
+	local oldtext = self.tv.buffer.text
+	local newtext = ""
+	local spacepattern = ""
+	for i = 1, spaces do spacepattern = spacepattern .. " " end
+	local pattern = "^	*" .. spacepattern
+	for line in oldtext:gmatch "[^\n]*" do
+		while line:match(pattern) do
+			line = line:gsub(spacepattern, "	")
+		end
+		-- Pattern is a tab character followed by a space.
+		while line:match "	 " do
+			-- Replace with just a tab character.
+			line = line:gsub("	 ", "	")
+		end
+		newtext = newtext .. line .. "\n"
+	end
+	newtext = newtext:match ".*[^\n]"
+	self.tv.buffer.text = newtext
+	self.tv.buffer:end_user_action()
+end
+
+function editor:unfixindent(spaces)
+	assert(type(spaces) == "number")
+	assert(spaces > 0)
+	self.tv.buffer:begin_user_action()
+	local oldtext = self.tv.buffer.text
+	local newtext = ""
+	local spacepattern = ""
+	for i = 1, spaces do spacepattern = spacepattern .. " " end
+	local pattern = "^ *	"
+	for line in oldtext:gmatch "[^\n]*" do
+		while line:match(pattern) do
+			line = line:gsub("	", spacepattern)
+		end
+		newtext = newtext .. line .. "\n"
+	end
+	newtext = newtext:match ".*[^\n]"
+	self.tv.buffer.text = newtext
+	if restoreafter then
+		self.indentspaces = spaces
+	end
+	self.tv.buffer:end_user_action()
+end
+
+function editor:show_properties()
+	local indentsizes = { 2, 3, 4, 8 }
+	local flowboxsettings = {
+		css_name = "row",
+		margin_start = 18,
+		margin_end = 18,
+		margin_top = 6,
+		margin_bottom = 6,
+		column_spacing = 12,
+		row_spacing = 12,
+		halign = "CENTER",
+		valign = "CENTER",
+	}
+	local s2tbox = Gtk.FlowBox(flowboxsettings)
+	local t2sbox = Gtk.FlowBox(flowboxsettings)
+	for _, s in ipairs(indentsizes) do
+		s2tbox:append(Gtk.Button {
+			label = ("%d spaces → tabs"):format(s),
+			on_clicked = function() self:fixindent(s) end,
+			extra_css_classes = { "numeric" },
+		})
+		t2sbox:append(Gtk.Button {
+			label = ("Tabs → %d spaces"):format(s),
+			on_clicked = function() self:unfixindent(s) end,
+			extra_css_classes = { "numeric" },
+		})
+	end
+	local prefsdialog = Adw.PreferencesDialog {
+		name = "Configure Document",
+		Adw.PreferencesPage {
+			Adw.PreferencesGroup {
+				title = "Correct Indentation",
+				description = "Convert leading spaces to tab characters.",
+				Gtk.ListBox {
+					css_classes = { "boxed-list" },
+					selection_mode = "NONE",
+					s2tbox,
+				},
+			},
+			Adw.PreferencesGroup {
+				title = "Restore Indentation",
+				description = "Convert leading tabs to space characters.",
+				Gtk.ListBox {
+					css_classes = { "boxed-list" },
+					selection_mode = "NONE",
+					t2sbox,
+				},
+			},
+		},
+	}
+	prefsdialog:present(self.tv)
 end
 
 function editor:begin_jumpover()
