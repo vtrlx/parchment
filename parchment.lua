@@ -1567,50 +1567,36 @@ function editor:unfixindent(spaces)
 end
 
 function editor:show_properties()
-	local indentsizes = { 2, 3, 4, 8 }
-	local flowboxsettings = {
-		css_name = "row",
-		margin_start = 18,
-		margin_end = 18,
-		margin_top = 6,
-		margin_bottom = 6,
-		column_spacing = 12,
-		row_spacing = 12,
-		halign = "CENTER",
-		valign = "CENTER",
+	local s2tbox = Gtk.ListBox {
+		selection_mode = "NONE",
+		extra_css_classes = { "boxed-list-separate" },
 	}
-	local s2tbox = Gtk.FlowBox(flowboxsettings)
-	local t2sbox = Gtk.FlowBox(flowboxsettings)
-	for _, s in ipairs(indentsizes) do
-		s2tbox:append(Gtk.Button {
-			label = ("%d spaces → tabs"):format(s),
-			on_clicked = function() self:fixindent(s) end,
-			extra_css_classes = { "numeric" },
+	local t2sbox = Gtk.ListBox {
+		selection_mode = "NONE",
+		extra_css_classes = { "boxed-list-separate" },
+	}
+	for _, v in ipairs { 2, 3, 4, 8 } do
+		s2tbox:append(Adw.ButtonRow {
+			title = ("Convert %d spaces → tabs"):format(v),
+			on_activated = function() self:fixindent(v) end,
 		})
-		t2sbox:append(Gtk.Button {
-			label = ("Tabs → %d spaces"):format(s),
-			on_clicked = function() self:unfixindent(s) end,
-			extra_css_classes = { "numeric" },
+		t2sbox:append(Adw.ButtonRow {
+			title = ("Convert tabs → %d spaces"):format(v),
+			on_activated = function() self:unfixindent(v) end,
 		})
 	end
 	local prefsdialog = Adw.PreferencesDialog {
-		name = "Configure Document",
+		title = "Adjust Document",
 		Adw.PreferencesPage {
 			Adw.PreferencesGroup {
-				title = "Correct Indentation",
-				description = "Convert leading spaces to tab characters.",
-				Gtk.ListBox {
-					css_classes = { "boxed-list" },
-					selection_mode = "NONE",
+				title = "Adjust Indentation",
+				description = "Convert between leading spaces and tabs.",
+				Adw.WrapBox {
+					justify = "FILL",
+					justify_last_line = true,
+					child_spacing = 12,
+					line_spacing = 12,
 					s2tbox,
-				},
-			},
-			Adw.PreferencesGroup {
-				title = "Restore Indentation",
-				description = "Convert leading tabs to space characters.",
-				Gtk.ListBox {
-					css_classes = { "boxed-list" },
-					selection_mode = "NONE",
 					t2sbox,
 				},
 			},
