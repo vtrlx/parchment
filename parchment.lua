@@ -305,6 +305,7 @@ end
 -- SECTION: Text editor
 
 local editor = newclass(function(self)
+	self.indenttags = {}
 	local search_entry = Gtk.Text {
 		placeholder_text = "Find in file…",
 		hexpand = true,
@@ -429,7 +430,7 @@ local editor = newclass(function(self)
 		top_margin = 12,
 		bottom_margin = 400,
 		left_margin = 24,
-		right_margin = 24,
+		right_margin = 30,
 		pixels_above_lines = above,
 		pixels_below_lines = below,
 		pixels_inside_wrap = 0,
@@ -527,6 +528,22 @@ local editor = newclass(function(self)
 	It's believed that the reason for the find function's excellent performance is that it uses Lua's string search functions, which are optimized to work especially well for long strings of text.
 ]]--
 	self.tv.buffer.on_changed = dosearch
+--[[
+	self.tv.buffer.on_insert_text:connect(function(buffer, location, text, len)
+		local count = 0
+		for _ in text:gmatch "[^\n]*" do count = count + 1 end
+		local endline = location:get_line() + 1
+		local startline = endline - count + 1
+		for i = startline, endline do self:markindent(i) end
+	end, nil, true)
+	self.tv.on_map = function()
+		if self.did_first_indent then return end
+		GLib.timeout_add(GLib.PRIORITY_DEFAULT, 40, function()
+			self:markallindents()
+		end)
+		self.did_first_indent = true
+	end
+]]--
 	search_entry.buffer.on_notify.text = dosearch
 	replace_entry.buffer.on_notify.text = replchanged
 	prev_match.on_clicked = prev
@@ -1650,6 +1667,49 @@ function editor:begin_jumpover()
 	popover:set_parent(self.tv)
 	popover:popup()
 	self.scroll.kinetic_scrolling = true
+end
+
+local function matchindent(str)
+	-- C/C++ comment
+	return str:match "^	*/[/%*]%s*"
+		-- Lua comment and various Markdown things.
+		or str:match "^	*[%>%-%*%#]+%s+"
+		-- Just tabs, or the empty string.
+		or str:match "^	*"
+end
+
+function editor:markindent(line)
+	local buffer = self.tv.buffer
+	if line < 1 or line > buffer:get_line_count() then return end
+	local sol = buffer:get_iter_at_line(line - 1)
+	local eol = sol:copy()
+	eol:forward_to_line_end()
+	buffer:remove_all_tags(sol, eol)
+	local indent_level = #matchindent(sol:get_slice(eol))
+	if indent_level == 0 then return end
+	start_visible = sol:copy()
+	start_visible:forward_chars(indent_level)
+	local location = self.tv:get_iter_location(start_visible)
+	local indent = -(location.x - self.tv.left_margin)
+	if not self.indenttags[indent] then
+		self.indenttags[indent] = Gtk.TextTag {
+			indent = indent,
+		}
+		buffer.tag_table:add(self.indenttags[indent])
+	end
+	buffer:apply_tag(self.indenttags[indent], sol, eol)
+end
+
+function editor:markallindents(start, finish)
+	if not self.tv:get_realized() then return end
+	local buffer = self.tv.buffer
+	if not start then start = buffer:get_start_iter() end
+	if not finish then finish = buffer:get_end_iter() end
+	local startline = start:get_line() + 1
+	local endline = finish:get_line() + 1
+	for i = startline, endline do
+		self:markindent(i)
+	end
 end
 
 -- SECTION: Application callbacks and startup
