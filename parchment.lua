@@ -91,7 +91,7 @@ end
 
 function lib.escapepattern(str)
 	-- Lua's string.gmatch function does not have a plain option. This takes input strings and returns their pattern equivalent, allowing string.gmatch to work as though it didn't match patterns.
-	return str:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+	return str:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%1")
 end
 
 function lib.escaperepl(str)
@@ -850,13 +850,15 @@ local function new_window()
 	}
 ]]--
 
-	local window = Adw.ApplicationWindow.new(app)
---	window.content = tab_overview
-	window.content = content
-	window.title = app_title
+	local window = Adw.ApplicationWindow {
+		application = app,
+--		content = tab_overview,
+		content = content,
+		title = app_title,
+		width_request = 480,
+		height_request = 240,
+	}
 	window:set_default_size(640, 720)
-	window.width_request = 480
-	window.height_request = 240
 
 	function tab_view:on_page_attached(page)
 		file_properties_button.visible = true

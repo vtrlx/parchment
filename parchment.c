@@ -17,6 +17,12 @@ You should have received a copy of the GNU General Public License along with thi
 #include <lauxlib.h>
 #include <lualib.h>
 
+#ifdef DEVEL
+#define APP_ID "ca.vtrlx.Parchment.Devel"
+#else
+#define APP_ID "ca.vtrlx.Parchment"
+#endif
+
 #define QUOTE(name) #name
 #define MSTR(macro) QUOTE(macro)
 
@@ -34,11 +40,7 @@ get_is_devel_lua(lua_State *L)
 static int
 get_app_id_lua(lua_State *L)
 {
-#ifdef DEVEL
-	lua_pushstring(L, "ca.vtrlx.Parchment.Devel");
-#else
-	lua_pushstring(L, "ca.vtrlx.Parchment");
-#endif
+	lua_pushstring(L, APP_ID);
 	return 1;
 }
 
@@ -76,20 +78,16 @@ static const luaL_Reg parchmentlib[] = {
 	{ NULL, NULL },
 };
 
-extern char _binary_parchment_bytecode_start[];
-extern char _binary_parchment_bytecode_end[];
+const char parchment_bytecode[] = {
+#embed "parchment.bytecode"
+};
 
 int
 main(int _argc, char **_argv)
 {
 	lua_State *L;
 	const char *message;
-	char *bytecode_end, *bytecode_start;
-	size_t bytecode_len;
-
-	bytecode_end = (char *)&_binary_parchment_bytecode_end;
-	bytecode_start = (char *)&_binary_parchment_bytecode_start;
-	bytecode_len = bytecode_end - bytecode_start;
+	int lua_result;
 
 	argc = _argc;
 	argv = _argv;
@@ -104,7 +102,8 @@ main(int _argc, char **_argv)
 	lua_settable(L, -3);
 	lua_remove(L, -1);
 
-	switch (luaL_loadbuffer(L, bytecode_start, bytecode_len, "parchment")) {
+	lua_result = luaL_loadbuffer(L, parchment_bytecode, sizeof (parchment_bytecode), APP_ID);
+	switch (lua_result) {
 	case LUA_ERRSYNTAX:
 		fprintf(stderr, "Failed to load Parchment: binary is malformed.\n");
 		message = luaL_checkstring(L, -1);
