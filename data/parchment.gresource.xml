@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+	<gresource prefix="/ca/vtrlx/Parchment">
+		<file preprocess="xml-stripblanks">icons/scalable/actions/entry-clear-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/file-new-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/file-open-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/file-save-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/find-replace-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/find-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/menu-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/modify-formatting-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/next-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/pencil-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/prev-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/zoom-minus-symbolic.svg</file>
+		<file preprocess="xml-stripblanks">icons/scalable/actions/zoom-plus-symbolic.svg</file>
+	</gresource>
+</gresources>

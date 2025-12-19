@@ -139,6 +139,7 @@ local app_title = "Parchment"
 local app_version = lib.get_app_ver()
 local app  = Adw.Application {
 	application_id = app_id,
+	resource_base_path = "/ca/vtrlx/Parchment", -- Needs to be hardcoded.
 	flags = { "HANDLES_OPEN", "HANDLES_COMMAND_LINE" },
 }
 
@@ -173,6 +174,17 @@ local function error(...)
 	-- Call Lua's builtin error() function so this new one has the same semantics of unwinding the call stack.
 	lerror(...)
 end
+
+-- SECTION: GResources
+
+do -- Load and register GResource.
+	local resource, err = Gio.Resource.load "/app/data/parchment.gresource"
+	if resource then
+		Gio.resources_register(resource)
+	else
+		print("Failed to load resource", err)
+	end
+end -- Load and register GResource.
 
 -- SECTION: Critically important global variables
 local editors = {}
@@ -312,7 +324,7 @@ local editor = newclass(function(self)
 	}
 	local search_clear = Gtk.Button {
 		css_name = "image",
-		icon_name = "edit-clear-symbolic",
+		icon_name = "entry-clear-symbolic",
 		margin_start = 12,
 		visible = false,
 		on_clicked = function()
@@ -335,18 +347,18 @@ local editor = newclass(function(self)
 		css_name = "entry",
 		Gtk.Image {
 			css_classes = { "parchment" },
-			icon_name = "system-search-symbolic",
+			icon_name = "find-symbolic",
 		},
 		search_entry,
 		search_clear,
 		matchnum_label,
 	}
 	local prev_match = Gtk.Button {
-		icon_name = "go-up-symbolic",
+		icon_name = "prev-symbolic",
 		tooltip_text = "Go to previous match",
 	}
 	local next_match = Gtk.Button {
-		icon_name = "go-down-symbolic",
+		icon_name = "next-symbolic",
 		tooltip_text = "Go to next match",
 	}
 	local search_box = Gtk.Box {
@@ -358,7 +370,7 @@ local editor = newclass(function(self)
 	}
 	local replace_image = Gtk.Image {
 		css_classes = { "parchment" },
-		icon_name = "edit-find-replace-symbolic",
+		icon_name = "find-replace-symbolic",
 	}
 	local replace_entry = Gtk.Text {
 		placeholder_text = "Replace with…",
@@ -366,7 +378,7 @@ local editor = newclass(function(self)
 	}
 	local replace_clear = Gtk.Button {
 		css_name = "image",
-		icon_name = "edit-clear-symbolic",
+		icon_name = "entry-clear-symbolic",
 		margin_start = 12,
 		margin_end = 6,
 		visible = false,
@@ -727,25 +739,25 @@ local function new_window()
 	local new_tab_button = Gtk.Button {
 		action_name = "win.new-file",
 		halign = "START",
-		icon_name = "document-new-symbolic",
+		icon_name = "file-new-symbolic",
 		tooltip_text = "New file",
 	}
 
 	local open_file_button = Gtk.Button {
 		action_name = "win.open-file",
-		icon_name = "document-open-symbolic",
+		icon_name = "file-open-symbolic",
 		tooltip_text = "Open a file",
 	}
 
 	local zoom_out_button = Gtk.Button {
 		action_name = "app.zoom-out",
-		icon_name = "zoom-out-symbolic",
+		icon_name = "zoom-minus-symbolic",
 		tooltip_text = "Zoom out",
 	}
 
 	local zoom_in_button = Gtk.Button {
 		action_name = "app.zoom-in",
-		icon_name = "zoom-in-symbolic",
+		icon_name = "zoom-plus-symbolic",
 		tooltip_text = "Zoom in",
 	}
 
@@ -783,7 +795,7 @@ local function new_window()
 	burger_popover:add_child(zoom_box, "zoom_section")
 	local menu_button = Gtk.MenuButton {
 		direction = "DOWN",
-		icon_name = "open-menu-symbolic",
+		icon_name = "menu-symbolic",
 		popover = burger_popover,
 	}
 
@@ -804,13 +816,13 @@ local function new_window()
 
 	local save_button = Gtk.Button {
 		action_name = "win.save-file",
-		icon_name = "document-save-symbolic",
+		icon_name = "file-save-symbolic",
 		tooltip_text = "Save file",
 		visible = false,
 	}
 
 	local file_properties_button = Gtk.Button {
-		icon_name = "document-properties-symbolic",
+		icon_name = "modify-formatting-symbolic",
 		tooltip_text = "Modify formatting…",
 		visible = false,
 		on_clicked = function()
@@ -868,7 +880,7 @@ local function new_window()
 		function e:set_title(title, subtitle, icon)
 			page.title = title
 			if icon then
-				local iname = "document-edit-symbolic"
+				local iname = "pencil-symbolic"
 				page.indicator_icon = Gio.Icon.new_for_string(iname)
 			else
 				page.indicator_icon = nil
