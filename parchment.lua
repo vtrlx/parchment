@@ -485,7 +485,8 @@ local editor = newclass(function(self)
 			replace_all_button.visible = true
 		end
 		replace_button.sensitive = self:match_selected()
-		replace_in_sel_button.sensitive = not self:match_selected() and self:selection_has_match()
+		replace_in_sel_button.sensitive = not self:match_selected() and
+			self:selection_has_match()
 		replace_all_button.sensitive = #self.matches > 0
 		if search_entry.text == replace_entry.text then
 			replace_button.sensitive = false
@@ -821,17 +822,6 @@ local function new_window()
 		visible = false,
 	}
 
-	local file_properties_button = Gtk.Button {
-		icon_name = "modify-formatting-symbolic",
-		tooltip_text = "Modify formatting…",
-		visible = false,
-		on_clicked = function()
-			local e = get_focused_editor()
-			if not e then return end
-			e:show_properties()
-		end,
-	}
-
 	local window_title = Adw.WindowTitle.new(app_title, "")
 
 	local content_header = Adw.HeaderBar {
@@ -839,8 +829,8 @@ local function new_window()
 		show_start_title_buttons = false,
 		valign = "START",
 		start_packs = { new_tab_button, open_file_button, save_button },
-		end_packs = { menu_button, file_properties_button },
-		-- end_packs = { menu_button, tab_button, file_properties_button },
+		end_packs = { menu_button },
+		-- end_packs = { menu_button, tab_button },
 	}
 
 	local tab_bar = Adw.TabBar {
@@ -873,7 +863,6 @@ local function new_window()
 	window:set_default_size(640, 720)
 
 	function tab_view:on_page_attached(page)
-		file_properties_button.visible = true
 		local e = editors[page.child]
 		if not e then return end
 		content.top_bar_style = "RAISED_BORDER"
@@ -967,7 +956,6 @@ local function new_window()
 				window_title:set_title(app_title)
 				window_title:set_subtitle ""
 				save_button.visible = false
-				file_properties_button.visible = false
 				content.top_bar_style = "FLAT"
 				if window_widgets[window] then
 					window_widgets[window].open_folder_action.enabled = false
@@ -1547,93 +1535,6 @@ function editor:replace_all(pattern, repl)
 	GLib.timeout_add(GLib.PRIORITY_DEFAULT, 15, function()
 		vadj.value = (vadj.upper - vadj.lower) * ratio + vadj.lower
 	end)
-end
-
-function editor:fixindent(spaces)
-	assert(type(spaces) == "number")
-	assert(spaces > 0)
-	self.tv.buffer:begin_user_action()
-	local oldtext = self.tv.buffer.text
-	local newtext = ""
-	local spacepattern = ""
-	for i = 1, spaces do spacepattern = spacepattern .. " " end
-	local pattern = "^	*" .. spacepattern
-	for line in oldtext:gmatch "[^\n]*" do
-		while line:match(pattern) do
-			line = line:gsub(spacepattern, "	")
-		end
-		-- Pattern is a tab character followed by a space.
-		while line:match "	 " do
-			-- Replace with just a tab character.
-			line = line:gsub("	 ", "	")
-		end
-		newtext = newtext .. line .. "\n"
-	end
-	newtext = newtext:match ".*[^\n]"
-	self.tv.buffer.text = newtext
-	self.tv.buffer:end_user_action()
-end
-
-function editor:unfixindent(spaces)
-	assert(type(spaces) == "number")
-	assert(spaces > 0)
-	self.tv.buffer:begin_user_action()
-	local oldtext = self.tv.buffer.text
-	local newtext = ""
-	local spacepattern = ""
-	for i = 1, spaces do spacepattern = spacepattern .. " " end
-	local pattern = "^ *	"
-	for line in oldtext:gmatch "[^\n]*" do
-		while line:match(pattern) do
-			line = line:gsub("	", spacepattern)
-		end
-		newtext = newtext .. line .. "\n"
-	end
-	newtext = newtext:match ".*[^\n]"
-	self.tv.buffer.text = newtext
-	if restoreafter then
-		self.indentspaces = spaces
-	end
-	self.tv.buffer:end_user_action()
-end
-
-function editor:show_properties()
-	local s2tbox = Gtk.ListBox {
-		selection_mode = "NONE",
-		extra_css_classes = { "boxed-list-separate" },
-	}
-	local t2sbox = Gtk.ListBox {
-		selection_mode = "NONE",
-		extra_css_classes = { "boxed-list-separate" },
-	}
-	for _, v in ipairs { 2, 3, 4, 8 } do
-		s2tbox:append(Adw.ButtonRow {
-			title = ("Convert %d spaces → tabs"):format(v),
-			on_activated = function() self:fixindent(v) end,
-		})
-		t2sbox:append(Adw.ButtonRow {
-			title = ("Convert tabs → %d spaces"):format(v),
-			on_activated = function() self:unfixindent(v) end,
-		})
-	end
-	local prefsdialog = Adw.PreferencesDialog {
-		title = "Adjust Document",
-		Adw.PreferencesPage {
-			Adw.PreferencesGroup {
-				title = "Adjust Indentation",
-				description = "Convert between leading spaces and tabs.",
-				Adw.WrapBox {
-					justify = "FILL",
-					justify_last_line = true,
-					child_spacing = 12,
-					line_spacing = 12,
-					s2tbox,
-					t2sbox,
-				},
-			},
-		},
-	}
-	prefsdialog:present(self.tv)
 end
 
 function editor:begin_jumpover()
