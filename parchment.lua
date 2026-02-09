@@ -1,5 +1,5 @@
 --[[ parchment.lua (text editing application that feels like parchment)
-Copyright © 2024–2025 Victoria Lacroix
+Copyright © 2024–2026 Victoria Lacroix
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 
@@ -134,16 +134,19 @@ local Pango = LuaGObject.require "Pango"
 local Parchment = LuaGObject.package "Parchment"
 
 local app_id = lib.get_app_id()
+local is_standalone = lib.get_is_standalone()
+local app_flags = is_standalone and { "HANDLES_OPEN", "HANDLES_COMMAND_LINE", "NON_UNIQUE" } or { "HANDLES_OPEN", "HANDLES_COMMAND_LINE" }
 local is_devel = lib.get_is_devel()
 local app_title = "Parchment"
 local app_version = lib.get_app_ver()
 local app  = Adw.Application {
 	application_id = app_id,
 	resource_base_path = "/ca/vtrlx/Parchment", -- Needs to be hardcoded.
-	flags = { "HANDLES_OPEN", "HANDLES_COMMAND_LINE" },
+	flags = app_flags,
 }
 
 app:add_main_option("new-window", string.byte "n", "IN_MAIN", "NONE", "Create a new window.")
+app:add_main_option("standalone", string.byte "s", "IN_MAIN", "NONE", "Run Parchment standalone. Suitable for use as an $EDITOR.")
 
 -- Shortcuts from the GNOME HIG (https://developer.gnome.org/hig/reference/keyboard.html)
 local accels = {
@@ -656,42 +659,62 @@ end
 
 -- SECTION: Application menus
 
+local burger_menu = Gio.Menu()
 local zoom_item = Gio.MenuItem.new()
 local zoom_custom_value = GLib.Variant("s", "zoom_section")
 zoom_item:set_attribute_value("custom", zoom_custom_value)
-local file_menu = Gio.Menu()
-file_menu:append("Save As…", "win.save-file-as")
+burger_menu:append_item(zoom_item)
+
+if not is_standalone then
+	local file_menu = Gio.Menu()
+	file_menu:append("Save As…", "win.save-file-as")
+	burger_menu:append_section(nil, file_menu)
+end
+
 local nav_menu = Gio.Menu()
 nav_menu:append("Show in Files", "win.open-folder")
 nav_menu:append("Find/Replace", "win.search")
 nav_menu:append("Go to Line", "win.goto")
+burger_menu:append_section(nil, nav_menu)
+
 local app_menu = Gio.Menu()
-app_menu:append("New Window", "win.new-window")
+if not is_standalone then
+	app_menu:append("New Window", "win.new-window")
+end
 app_menu:append("Keyboard Shortcuts", "win.shortcuts")
 app_menu:append("About " .. app_title, "win.about")
-local burger_menu = Gio.Menu()
-burger_menu:append_item(zoom_item)
-burger_menu:append_section(nil, file_menu)
-burger_menu:append_section(nil, nav_menu)
 burger_menu:append_section(nil, app_menu)
 
 local shortcutsdialog = Adw.ShortcutsDialog {
 	Adw.ShortcutsSection {
 		title = "Parchment",
-		Adw.ShortcutsItem.new_from_action("Open a file", "win.open-file"),
-		Adw.ShortcutsItem.new_from_action("New file", "win.new-file"),
-		Adw.ShortcutsItem.new_from_action("New window", "win.new-window"),
-		Adw.ShortcutsItem.new_from_action("Open/close overview", "win.overview"),
-		Adw.ShortcutsItem.new_from_action("Show keyboard shortcuts", "win.shortcuts"),
+		table.unpack(not is_standalone and {
+			Adw.ShortcutsItem.new_from_action("Open a file", "win.open-file"),
+			Adw.ShortcutsItem.new_from_action("New file", "win.new-file"),
+			Adw.ShortcutsItem.new_from_action("New window", "win.new-window"),
+			--Adw.ShortcutsItem.new_from_action("Open/close overview", "win.overview"),
+			Adw.ShortcutsItem.new_from_action("Show keyboard shortcuts", "win.shortcuts"),
+		} or {
+			--Adw.ShortcutsItem.new_from_action("Open/close overview", "win.overview"),
+			Adw.ShortcutsItem.new_from_action("Show keyboard shortcuts", "win.shortcuts"),
+		}),
 	},
 	Adw.ShortcutsSection {
 		title = "Editor",
-		Adw.ShortcutsItem.new_from_action("Show in Files", "win.open-folder"),
-		Adw.ShortcutsItem.new_from_action("Save file", "win.save-file"),
-		Adw.ShortcutsItem.new_from_action("Save file as", "win.save-file-as"),
-		Adw.ShortcutsItem.new_from_action("Search in file", "win.search"),
-		Adw.ShortcutsItem.new_from_action("Go to line", "win.goto"),
-		Adw.ShortcutsItem.new_from_action("Close tab", "win.close-tab"),
+		table.unpack(not is_standalone and {
+			Adw.ShortcutsItem.new_from_action("Show in Files", "win.open-folder"),
+			Adw.ShortcutsItem.new_from_action("Save file", "win.save-file"),
+			Adw.ShortcutsItem.new_from_action("Save file as", "win.save-file-as"),
+			Adw.ShortcutsItem.new_from_action("Search in file", "win.search"),
+			Adw.ShortcutsItem.new_from_action("Go to line", "win.goto"),
+			Adw.ShortcutsItem.new_from_action("Close tab", "win.close-tab"),
+		} or {
+			Adw.ShortcutsItem.new_from_action("Show in Files", "win.open-folder"),
+			Adw.ShortcutsItem.new_from_action("Save file", "win.save-file"),
+			Adw.ShortcutsItem.new_from_action("Search in file", "win.search"),
+			Adw.ShortcutsItem.new_from_action("Go to line", "win.goto"),
+
+		}),
 	},
 	Adw.ShortcutsSection {
 		title = "Zoom",
@@ -727,7 +750,16 @@ end
 
 -- SECTION: Main application window
 
+local disabled_in_standalone = {
+	["new-window"] = true,
+	["new-file"] = true,
+	["open-file"]= true,
+	["save-file-as"] = true,
+	["close-tab"] = true,
+}
+
 local function add_new_action(map, name, cb)
+	if is_standalone and disabled_in_standalone[name] then return end
 	local action = Gio.SimpleAction.new(name)
 	action.enabled = true
 	action.on_activate = cb
@@ -839,7 +871,7 @@ local function new_window()
 		title_widget = window_title,
 		show_start_title_buttons = false,
 		valign = "START",
-		start_packs = { new_tab_button, open_file_button, save_button },
+		start_packs = not is_standalone and { new_tab_button, open_file_button, save_button } or { save_button },
 		end_packs = { menu_button, file_properties_button },
 		-- end_packs = { menu_button, tab_button, file_properties_button },
 	}
@@ -887,7 +919,7 @@ local function new_window()
 				page.indicator_icon = nil
 			end
 			if tab_view.selected_page == page then
-				window.title = title
+				window.title = not is_standalone and title or (title .. " (standalone)")
 				window_title:set_title(title)
 				window_title:set_subtitle(subtitle)
 				save_button.tooltip_text = "Save " .. title
@@ -907,7 +939,7 @@ local function new_window()
 		-- Force set here, because the tab view's selected_page won't be set in time for this call.
 		local title, subtitle = e:get_title()
 		page.title = name
-		window.title = title
+		window.title = not is_standalone and title or (title .. " (standalone)")
 		window_title:set_title(title)
 		window_title:set_subtitle(subtitle)
 		window_widgets[window].open_folder_action.enabled = e:has_file()
@@ -1023,12 +1055,14 @@ local function new_window()
 		end
 	end
 
-	local file_drop_target = Gtk.DropTarget.new(Gio.File, Gdk.DragAction.COPY)
-	function file_drop_target:on_drop(value)
-		local file = value:get_object()
-		open_file(file:get_path())
+	if not is_standalone then
+		local file_drop_target = Gtk.DropTarget.new(Gio.File, Gdk.DragAction.COPY)
+		function file_drop_target:on_drop(value)
+			local file = value:get_object()
+			open_file(file:get_path())
+		end
+		window:add_controller(file_drop_target)
 	end
-	window:add_controller(file_drop_target)
 
 	add_new_action(window, "close-tab", function()
 		local page = tab_view.selected_page
@@ -1793,6 +1827,7 @@ function app:on_command_line(cli)
 		new_window()
 	end
 	if #files > 0 then app:open(files, "") end
+	if is_standalone and #files ~= 1 then app:quit() end
 	-- Signal that command line options have been handled and that the app should continue starting up.
 	cli:set_exit_status(0)
 	cli:done()

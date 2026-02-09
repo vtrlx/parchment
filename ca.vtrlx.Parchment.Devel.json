@@ -9,8 +9,21 @@
 		"--share=ipc",
 		"--socket=fallback-x11",
 		"--socket=wayland",
+		"--filesystem=host",
+		"--filesystem=host-os",
+		"--filesystem=host-etc",
 		"--filesystem=home",
-		"--persist=home"
+		"--filesystem=/tmp",
+		"--filesystem=/var",
+		"--filesystem=xdg-run/gvfs",
+		"--filesystem=xdg-run/gvfsd",
+		"--persist=host",
+		"--persist=host-os",
+		"--persist=host-etc",
+		"--persist=home",
+		"--persist=/tmp",
+		"--persist=/var",
+		"--talk-name=org.gtk.vfs.*"
 	],
 	"modules": [{
 		"name": "lua",

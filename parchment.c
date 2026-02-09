@@ -55,9 +55,16 @@ get_app_ver_lua(lua_State *L)
 	return 1;
 }
 
+static int standalone;
+static int
+get_is_standalone_lua(lua_State *L)
+{
+	lua_pushboolean(L, standalone);
+	return 1;
+}
+
 static int argc;
 static char **argv;
-
 static int
 get_cli_args_lua(lua_State *L)
 /* Returns each argument given to the command line. */
@@ -73,8 +80,9 @@ static const luaL_Reg parchmentlib[] = {
 	{ "get_is_devel", get_is_devel_lua },
 	{ "get_app_id", get_app_id_lua },
 	{ "get_app_ver", get_app_ver_lua },
+	{ "get_is_standalone", get_is_standalone_lua },
 	{ "get_cli_args", get_cli_args_lua },
-	/* sentinel item, marks the end of the array */
+	/* sentinel item marking the end of the array */
 	{ NULL, NULL },
 };
 
@@ -88,6 +96,11 @@ main(int _argc, char **_argv)
 	lua_State *L;
 	const char *message;
 	int lua_result;
+
+	standalone = 0;
+	for (int i = 0; i < _argc; ++i)
+		if (strcmp(_argv[i], "--standalone") == 0)
+			standalone = 1;
 
 	argc = _argc;
 	argv = _argv;
