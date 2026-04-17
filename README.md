@@ -1,3 +1,9 @@
+# [MOVED TO CODEBERG](https://codeberg.org/vtrlx/parchment)
+
+Development of Parchment continues [in its Codeberg repository](https://codeberg.org/vtrlx/parchment). Please submit issues and pull requests there.
+
+---
+
 ![parchment screenshot](parchment.png)
 
 #	Parchment
